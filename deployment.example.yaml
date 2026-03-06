@@ -1,0 +1,123 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nanoclaw-controller
+  namespace: nanoclaw
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: nanoclaw
+  name: nanoclaw-pod-manager
+rules:
+- apiGroups: ["", "batch"]
+  resources: ["pods", "pods/log", "pods/status", "jobs", "jobs/status"]
+  verbs: ["get", "list", "watch", "create", "delete", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nanoclaw-pod-manager-binding
+  namespace: nanoclaw
+subjects:
+- kind: ServiceAccount
+  name: nanoclaw-controller
+  namespace: nanoclaw
+roleRef:
+  kind: Role
+  name: nanoclaw-pod-manager
+  apiGroup: rbac.authorization.k8s.io
+---
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nanoclaw-builder
+  namespace: nanoclaw
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: nanoclaw-builder-role
+  namespace: nanoclaw
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["nanoclaw"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nanoclaw-builder-binding
+  namespace: nanoclaw
+subjects:
+  - kind: ServiceAccount
+    name: nanoclaw-builder
+    namespace: nanoclaw
+roleRef:
+  kind: Role
+  name: nanoclaw-builder-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nanoclaw
+  namespace: nanoclaw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nanoclaw
+  template:
+    metadata:
+      labels:
+        app: nanoclaw
+    spec:
+      serviceAccountName: nanoclaw-controller
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: controller
+        image: <REGISTRY_IP>:30500/nanoclaw:latest
+        imagePullPolicy: Always
+        workingDir: /app
+        env:
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: nanoclaw-secrets
+              key: GEMINI_API_KEY
+        - name: CONTAINER_RUNTIME
+          value: "k8s"
+        - name: K8S_NAMESPACE
+          value: "nanoclaw"
+        - name: K8S_PVC_NAME
+          value: "nanoclaw-pvc-final"
+        - name: K8S_PVC_SUBPATH
+          value: "."
+        - name: CONTAINER_IMAGE
+          value: "<REGISTRY_IP>:30500/nanoclaw-agent:latest"
+        - name: DISCORD_BOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: nanoclaw-secrets
+              key: DISCORD_BOT_TOKEN
+        - name: GIT_AUTHOR_NAME
+          value: "Andy (NanoClaw Swarm)"
+        - name: GIT_AUTHOR_EMAIL
+          value: "andy@nanoclaw.local"
+        - name: GIT_COMMITTER_NAME
+          value: "Andy (NanoClaw Swarm)"
+        - name: GIT_COMMITTER_EMAIL
+          value: "andy@nanoclaw.local"
+        volumeMounts:
+        - name: storage
+          mountPath: /app
+      volumes:
+      - name: storage
+        persistentVolumeClaim:
+          claimName: nanoclaw-pvc-final

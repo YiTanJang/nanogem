@@ -1,0 +1,32 @@
+# Node
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# NanoClaw Private Data (CRITICAL)
+data/
+store/
+groups/
+logs/
+.nanoclaw/
+ipc/
+
+# Secrets
+.env
+.env.local
+*.secret
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+.cache/
+.npm/
+nanoclaw-agent.tar
+deployment.yaml
+nanoclaw-storage-final.yaml

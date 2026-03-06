@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nanoclaw-pv-final
+spec:
+  capacity:
+    storage: 1800Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions:
+    - nfsvers=3
+    - tcp
+    - nolock
+  nfs:
+    path: /path/to/your/project/on/nfs
+    server: <NFS_SERVER_IP>
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nanoclaw-pvc-final
+  namespace: nanoclaw
+spec:
+  storageClassName: ""
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1800Gi
+  volumeName: nanoclaw-pv-final

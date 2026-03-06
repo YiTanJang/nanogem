@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paperless-mcp
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paperless-mcp
+  template:
+    metadata:
+      labels:
+        app: paperless-mcp
+        nanoclaw.io/mcp-server: "true"
+    spec:
+      containers:
+      - name: paperless-mcp
+        image: ghcr.io/baruchiro/paperless-mcp:latest
+        env:
+        - name: PAPERLESS_URL
+          value: "http://paperless:80"
+        - name: PAPERLESS_API_KEY
+          value: "57272df988399af588883466ea76322d79f8e2b1"
+        ports:
+        - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: paperless-mcp
+spec:
+  selector:
+    app: paperless-mcp
+  ports:
+  - port: 3000
+    targetPort: 3000

@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: silverbullet-mcp
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: silverbullet-mcp
+  template:
+    metadata:
+      labels:
+        app: silverbullet-mcp
+        nanoclaw.io/mcp-server: "true"
+    spec:
+      containers:
+      - name: silverbullet-mcp
+        image: ghcr.io/ahmad-a0/silverbullet-mcp:latest
+        env:
+        - name: SB_API_BASE_URL
+          value: "http://silverbullet:80"
+        - name: SB_AUTH_TOKEN
+          value: "jinho:jinho123!"
+        - name: MCP_TOKEN
+          value: "jinho123"
+        ports:
+        - containerPort: 4000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: silverbullet-mcp
+spec:
+  selector:
+    app: silverbullet-mcp
+  ports:
+  - port: 4000
+    targetPort: 4000

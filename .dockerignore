@@ -1,0 +1,10 @@
+node_modules
+dist
+data
+store
+logs
+groups
+.git
+.npm
+*.log
+nanoclaw-agent.tar

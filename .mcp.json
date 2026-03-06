@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "paperless": {
+      "url": "http://paperless-mcp.default.svc.cluster.local:3000/mcp",
+      "env": {
+        "MCP_TOKEN": "57272df988399af588883466ea76322d79f8e2b1"
+      }
+    },
+    "silverbullet": {
+      "url": "http://silverbullet-mcp.default.svc.cluster.local:4000/mcp",
+      "env": {
+        "MCP_TOKEN": "jinho123"
+      }
+    }
+  }
+}
