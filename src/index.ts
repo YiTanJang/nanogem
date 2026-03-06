@@ -10,7 +10,6 @@ import {
   getMcpConfig,
   DISCORD_BOT_TOKEN,
 } from './config.js';
-import { WhatsAppChannel } from './channels/whatsapp.js';
 import { DiscordChannel } from './channels/discord.js';
 import {
   ContainerOutput,
@@ -57,7 +56,6 @@ let sessions: Record<string, string> = {};
 let registeredGroups: Record<string, RegisteredGroup> = {};
 let lastAgentTimestamp: Record<string, string> = {};
 
-let whatsapp: WhatsAppChannel;
 const channels: Channel[] = [];
 const queue = new GroupQueue();
 
@@ -349,10 +347,6 @@ async function main(): Promise<void> {
     registeredGroups: () => registeredGroups,
   };
 
-  whatsapp = new WhatsAppChannel(channelOpts);
-  channels.push(whatsapp);
-  await whatsapp.connect();
-
   if (DISCORD_BOT_TOKEN) {
     const discord = new DiscordChannel({ ...channelOpts, token: DISCORD_BOT_TOKEN });
     channels.push(discord);
@@ -385,7 +379,7 @@ async function main(): Promise<void> {
       queue.setRegisteredGroups(registeredGroups);
       saveState();
     },
-    syncGroupMetadata: (force) => whatsapp?.syncGroupMetadata(force) ?? Promise.resolve(),
+    syncGroupMetadata: (force) => Promise.resolve(),
     getAvailableGroups,
     writeGroupsSnapshot: (gf, im, ag, rj) => writeGroupsSnapshot(gf, im, ag, rj),
     runBuildJob: k8sRuntime.runBuildJob,
