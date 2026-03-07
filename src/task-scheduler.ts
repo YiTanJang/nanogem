@@ -22,6 +22,7 @@ import {
   updateTask,
   updateTaskAfterRun,
   removeQueuedTask,
+  claimTask,
 } from './db.js';
 import { GroupQueue } from './group-queue.js';
 import { resolveGroupFolderPath } from './group-folder.js';
@@ -266,7 +267,12 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
         }
 
         const nextRun = calculateNextRun(currentTask);
-        updateTask(currentTask.id, { next_run: nextRun });
+        
+        // ATOMIC CLAIM: Only proceed if we successfully updated the DB for this specific run
+        if (!claimTask(currentTask.id, currentTask.next_run!, nextRun)) {
+          logger.debug({ taskId: currentTask.id }, 'Task already claimed by another process');
+          continue;
+        }
 
         deps.queue.enqueueTask(currentTask.chat_jid, currentTask.id, () =>
           runTask(currentTask, deps),
@@ -290,11 +296,13 @@ export function recoverQueuedTasks(deps: SchedulerDependencies): void {
       const task = getTaskById(queued.task_id);
       if (task) {
         const nextRun = calculateNextRun(task);
-        updateTask(task.id, { next_run: nextRun });
-
-        deps.queue.enqueueTask(task.chat_jid, task.id, () =>
-          runTask(task, deps),
-        );
+        
+        // ATOMIC CLAIM: Only proceed if we can claim this recovery run
+        if (claimTask(task.id, task.next_run!, nextRun)) {
+          deps.queue.enqueueTask(task.chat_jid, task.id, () =>
+            runTask(task, deps),
+          );
+        }
       } else {
         logger.warn(
           { taskId: queued.task_id },

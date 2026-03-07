@@ -1074,7 +1074,10 @@ async function main(): Promise<void> {
   const globalMdPath = '/workspace/global/GEMINI.md';
   const groupMdPath = '/workspace/group/GEMINI.md';
   
-  let systemPrompt = `You are ${input.assistantName || 'Andy'}, an autonomous AI agent running in a Kubernetes pod.`;
+  const now = new Date();
+  const timeContext = `\n\n### TEMPORAL CONTEXT\nCurrent Time: ${now.toLocaleString('en-US', { timeZone: process.env.TZ || 'UTC' })}\nTimezone: ${process.env.TZ || 'UTC'}`;
+
+  let systemPrompt = `You are ${input.assistantName || 'Andy'}, an autonomous AI agent running in a Kubernetes pod.${timeContext}`;
 
   if (fs.existsSync(groupMdPath)) {
     systemPrompt = formatRolePrompt(fs.readFileSync(groupMdPath, 'utf-8'));

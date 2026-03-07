@@ -3,7 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { BASE_DIR, NANOCLAW_DIR } from './constants.js';
+import { BASE_DIR, NANOCLAW_DIR, SKILLS_DIR } from './constants.js';
 import { copyDir } from './fs-utils.js';
 import { readManifest } from './manifest.js';
 import { mergeFile } from './merge.js';
@@ -29,14 +29,14 @@ export interface ReplayResult {
 }
 
 /**
- * Scan .gemini/skills/ for a directory whose manifest.yaml has skill: <skillName>.
+ * Scan .nanoclaw/skills/ for a directory whose manifest.yaml has skill: <skillName>.
  */
 export function findSkillDir(
   skillName: string,
   projectRoot?: string,
 ): string | null {
   const root = projectRoot ?? process.cwd();
-  const skillsRoot = path.join(root, '.gemini', 'skills');
+  const skillsRoot = path.join(root, SKILLS_DIR);
   if (!fs.existsSync(skillsRoot)) return null;
 
   for (const entry of fs.readdirSync(skillsRoot, { withFileTypes: true })) {
