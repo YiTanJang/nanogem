@@ -452,6 +452,9 @@ async function runAgentPod(
       const fsWatcher = fs.watch(groupIpcDir, (eventType, filename) => {
         if (filename && filename.startsWith('exit-') && filename.endsWith('.json')) {
           logger.info({ podName, filename }, 'Agent brain exit sentinel detected');
+          try {
+            fs.unlinkSync(path.join(groupIpcDir, filename));
+          } catch (e) {}
           fsWatcher.close();
           _resolvePod();
         }
@@ -501,8 +504,12 @@ async function runAgentPod(
           }
 
           // Check for missed exit sentinels
-          if (files.some(f => f.startsWith('exit-'))) {
-            logger.info({ podName }, 'Exit sentinel found by poller');
+          const exitFile = files.find(f => f.startsWith('exit-'));
+          if (exitFile) {
+            logger.info({ podName, exitFile }, 'Exit sentinel found by poller');
+            try {
+              fs.unlinkSync(path.join(groupIpcDir, exitFile));
+            } catch (e) {}
             fsWatcher.close();
             _resolvePod();
           }

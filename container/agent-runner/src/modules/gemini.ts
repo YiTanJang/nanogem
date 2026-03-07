@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import fs from 'fs';
 import path from 'path';
-import { ContainerInput, ContainerOutput, IPC_INPUT_CLOSE_SENTINEL, IPC_INPUT_DIR, IPC_POLL_MS } from './types.js';
+import { ContainerInput, ContainerOutput, IPC_DIR, IPC_INPUT_CLOSE_SENTINEL, IPC_INPUT_DIR, IPC_POLL_MS } from './types.js';
 import { McpManager } from './mcp.js';
 
 export class GeminiManager {
