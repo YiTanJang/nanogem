@@ -336,12 +336,18 @@ export const getFunctions = (
     try {
       const searchResponse = await client.models.generateContent({
         model: modelName,
-        contents: [{ role: 'user', parts: [{ text: `Search the web and summary: ${query}` }] }],
+        contents: [{ role: 'user', parts: [{ text: `Search the web and provide a detailed summary for: ${query}` }] }],
         config: { tools: [{ googleSearch: {} }] }
       });
-      return (searchResponse.text || 'No information found.') + '\n\n[Sources: Google Search]';
+      
+      const text = searchResponse.text;
+      let metadata = '';
+      if (searchResponse.candidates?.[0]?.groundingMetadata?.searchEntryPoint?.renderedContent) {
+        metadata = '\n\n[Sources: Google Search]';
+      }
+      return (text || 'No information found.') + metadata;
     } catch (err: any) {
-      return `Error: ${err.message}`;
+      return `Error performing native search: ${err.message}`;
     }
   },
   web_fetch: async ({ url }: any) => {
