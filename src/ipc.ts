@@ -45,6 +45,11 @@ export interface IpcDeps {
     shouldRollout?: boolean,
     customJobName?: string,
   ) => Promise<{ status: 'success' | 'error'; error?: string }>;
+  createDiscordThread?: (
+    parentJid: string,
+    name: string,
+  ) => Promise<{ jid: string; url: string }>;
+  deleteDiscordThread?: (jid: string) => Promise<void>;
 }
 
 let ipcWatcherRunning = false;
@@ -211,6 +216,8 @@ export async function processTaskIpc(
     shouldRollout?: boolean;
     timestamp?: string;
     resumptionPrompt?: string;
+    // For Discord
+    parentJid?: string;
   },
   sourceGroup: string, // Verified identity from IPC directory
   isMain: boolean, // Verified from directory path
@@ -286,7 +293,7 @@ export async function processTaskIpc(
         }
 
         const validContextModes = ['isolated', 'group'];
-        const contextMode = validContextModes.includes(data.context_mode) ? data.context_mode : 'isolated';
+        const contextMode = data.context_mode && validContextModes.includes(data.context_mode) ? data.context_mode : 'isolated';
 
         const taskId = `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         createTask({
@@ -424,6 +431,88 @@ export async function processTaskIpc(
           { data },
           'Invalid delete_group request - missing jid',
         );
+      }
+      break;
+
+    case 'delete_discord_thread':
+      if (isMain) {
+        if (data.jid) {
+          logger.info({ jid: data.jid }, 'Deleting sub-agent and Discord thread via IPC');
+          // 1. Delete the logical agent and its files
+          deps.deleteGroup(data.jid);
+          
+          // 2. Delete the physical thread on Discord
+          if (deps.deleteDiscordThread && data.jid.startsWith('discord-')) {
+            await deps.deleteDiscordThread(data.jid);
+          }
+          
+          // Write updated snapshot immediately
+          const availableGroups = deps.getAvailableGroups();
+          deps.writeGroupsSnapshot(
+            sourceGroup,
+            isMain,
+            availableGroups,
+            new Set(Object.keys(deps.registeredGroups())),
+          );
+
+          await deps.sendMessage(sourceGroup, `Successfully deleted sub-agent and its Discord thread: ${data.jid}`);
+        } else {
+          logger.warn({ data }, 'Invalid delete_discord_thread request - missing jid');
+        }
+      } else {
+        logger.warn({ sourceGroup }, 'Unauthorized delete_discord_thread attempt blocked');
+      }
+      break;
+
+    case 'create_discord_thread':
+      if (isMain && deps.createDiscordThread) {
+        if (data.parentJid && data.name && data.folder && data.systemInstruction) {
+          try {
+            // 1. Create the physical thread on Discord
+            const thread = await deps.createDiscordThread(data.parentJid, data.name);
+            
+            // 2. Setup IPC directories for the new group
+            const groupIpcDir = path.join(DATA_DIR, 'ipc', data.folder);
+            fs.mkdirSync(path.join(groupIpcDir, 'messages'), { recursive: true });
+            fs.mkdirSync(path.join(groupIpcDir, 'tasks'), { recursive: true });
+            fs.mkdirSync(path.join(groupIpcDir, 'input'), { recursive: true });
+
+            // 3. Register the group in the database, linked to the thread JID
+            deps.registerGroup(thread.jid, {
+              name: data.name,
+              folder: data.folder,
+              trigger: data.trigger || '@NanoClaw', // Threads usually don't strictly need a trigger but good to have
+              added_at: new Date().toISOString(),
+              containerConfig: data.containerConfig,
+              requiresTrigger: false, // DMs and Threads are exclusive contexts
+              systemInstruction: data.systemInstruction,
+              ephemeral: data.ephemeral ?? true, // Default to true for dynamic threads
+            });
+
+            // Update snapshot immediately so list_groups works
+            const availableGroups = deps.getAvailableGroups();
+            deps.writeGroupsSnapshot(
+              sourceGroup,
+              isMain,
+              availableGroups,
+              new Set(Object.keys(deps.registeredGroups())),
+            );
+
+            // 4. Report back to the main agent with the URL
+            logger.info({ threadJid: thread.jid, url: thread.url }, 'Created dynamic Discord thread');
+            const targetJid = data.chatJid || sourceGroup;
+            await deps.sendMessage(targetJid, `Successfully created sub-agent thread: ${thread.url}\nAny messages in that thread will be routed to the '${data.folder}' agent.`);
+
+          } catch (err) {
+            logger.error({ err, data }, 'Failed to create Discord thread');
+            const targetJid = data.chatJid || sourceGroup;
+            await deps.sendMessage(targetJid, `Error creating Discord thread: ${err}`);
+          }
+        } else {
+          logger.warn({ data }, 'Invalid create_discord_thread request - missing fields');
+        }
+      } else {
+        logger.warn({ sourceGroup }, 'Unauthorized or unsupported create_discord_thread attempt');
       }
       break;
 

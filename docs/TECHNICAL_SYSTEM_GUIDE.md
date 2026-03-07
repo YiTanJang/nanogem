@@ -23,14 +23,13 @@ To wake up an agent or perform a management action, write a JSON file to `/works
 - `register_group`: Creates a new group. Requires `jid`, `name`, `folder`, `trigger`.
 - `delete_group`: Deletes a group. Requires `jid`.
 - `rebuild_self`: Rebuilds the container image.
-- `refresh_groups`: Syncs available groups from WhatsApp.
 
 ## 2. Database Schema (`store/messages.db`)
 
 Andy can query the database using the `bash` tool and `sqlite3`.
 
 ### Key Tables:
-- `messages`: All captured WhatsApp messages.
+- `messages`: All captured Discord messages.
 - `registered_groups`: Configuration for all autonomous groups.
 - `scheduled_tasks`: All background tasks and their status.
 - `router_state`: Cursor positions (`last_timestamp`) for the message loop.

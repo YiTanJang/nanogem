@@ -4,20 +4,20 @@
 
 | Entity | Trust Level | Rationale |
 |--------|-------------|-----------|
-| Main group | Trusted | Private self-chat, admin control |
+| Main group | Trusted | Private Discord channel, admin control |
 | Non-main groups | Untrusted | Other users may be malicious |
 | Container agents | Sandboxed | Isolated execution environment |
-| WhatsApp messages | User input | Potential prompt injection |
+| Discord messages | User input | Potential prompt injection |
 
 ## Security Boundaries
 
-### 1. Container Isolation (Primary Boundary)
+### 1. Container/Pod Isolation (Primary Boundary)
 
-Agents execute in containers (lightweight Linux VMs), providing:
-- **Process isolation** - Container processes cannot affect the host
-- **Filesystem isolation** - Only explicitly mounted directories are visible
-- **Non-root execution** - Runs as unprivileged `node` user (uid 1000)
-- **Ephemeral containers** - Fresh environment per invocation (`--rm`)
+Agents execute in isolated containers or Kubernetes pods, providing:
+- **Process isolation** - Container processes cannot affect the host.
+- **Filesystem isolation** - Only explicitly mounted directories are visible.
+- **Non-root execution** - Runs as unprivileged `node` user (uid 1000).
+- **Ephemeral environment** - Fresh environment per invocation.
 
 This is the primary security boundary. Rather than relying on application-level permission checks, the attack surface is limited by what's mounted.
 
@@ -37,7 +37,7 @@ private_key, .secret
 
 **Protections:**
 - Symlink resolution before validation (prevents traversal attacks)
-- Container path validation (rejects `..` and absolute paths)
+- Path validation (rejects `..` and absolute paths)
 - `nonMainReadOnly` option forces read-only for non-main groups
 
 **Read-Only Project Root:**
@@ -47,9 +47,9 @@ The main group's project root is mounted read-only. Writable paths the agent nee
 ### 3. Session Isolation
 
 Each group has isolated Gemini sessions at `data/sessions/{group}/.gemini/`:
-- Groups cannot see other groups' conversation history
-- Session data includes full message history and file contents read
-- Prevents cross-group information disclosure
+- Groups cannot see other groups' conversation history.
+- Session data includes full message history and file contents read.
+- Prevents cross-group information disclosure.
 
 ### 4. IPC Authorization
 
@@ -67,10 +67,10 @@ Messages and task operations are verified against group identity:
 ### 5. Credential Handling
 
 **Mounted Credentials:**
-- Gemini API keys (filtered from `.env`, read-only)
+- Gemini API keys (filtered from `.env` or K8s secrets, read-only)
 
 **NOT Mounted:**
-- WhatsApp session (`store/auth/`) - host only
+- Discord tokens - host only
 - Mount allowlist - external, never mounted
 - Any credentials matching blocked patterns
 
@@ -79,8 +79,6 @@ Only these environment variables are exposed to containers:
 ```typescript
 const allowedVars = ['GEMINI_API_KEY'];
 ```
-
-> **Note:** Gemini API keys are passed to the container so that the agent can authenticate. Ideally, the agent runner would authenticate without exposing credentials to the agent's execution environment, but I couldn't figure this out. **PRs welcome** if you have ideas for credential isolation.
 
 ## Privilege Comparison
 
@@ -98,7 +96,7 @@ const allowedVars = ['GEMINI_API_KEY'];
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                        UNTRUSTED ZONE                             │
-│  WhatsApp Messages (potentially malicious)                        │
+│  Discord Messages (potentially malicious)                          │
 └────────────────────────────────┬─────────────────────────────────┘
                                  │
                                  ▼ Trigger check, input escaping
@@ -107,7 +105,7 @@ const allowedVars = ['GEMINI_API_KEY'];
 │  • Message routing                                                │
 │  • IPC authorization                                              │
 │  • Mount validation (external allowlist)                          │
-│  • Container lifecycle                                            │
+│  • Container/Pod lifecycle                                        │
 │  • Credential filtering                                           │
 └────────────────────────────────┬─────────────────────────────────┘
                                  │

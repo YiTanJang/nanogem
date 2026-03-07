@@ -42,43 +42,43 @@ function store(overrides: {
 
 describe('storeMessage', () => {
   it('stores a message and retrieves it', () => {
-    storeChatMetadata('group@g.us', '2024-01-01T00:00:00.000Z');
+    storeChatMetadata('group', '2024-01-01T00:00:00.000Z');
 
     store({
       id: 'msg-1',
-      chat_jid: 'group@g.us',
-      sender: '123@s.whatsapp.net',
+      chat_jid: 'group',
+      sender: '123',
       sender_name: 'Alice',
       content: 'hello world',
       timestamp: '2024-01-01T00:00:01.000Z',
     });
 
     const messages = getMessagesSince(
-      'group@g.us',
+      'group',
       '2024-01-01T00:00:00.000Z',
       'Andy',
     );
     expect(messages).toHaveLength(1);
     expect(messages[0].id).toBe('msg-1');
-    expect(messages[0].sender).toBe('123@s.whatsapp.net');
+    expect(messages[0].sender).toBe('123');
     expect(messages[0].sender_name).toBe('Alice');
     expect(messages[0].content).toBe('hello world');
   });
 
   it('filters out empty content', () => {
-    storeChatMetadata('group@g.us', '2024-01-01T00:00:00.000Z');
+    storeChatMetadata('group', '2024-01-01T00:00:00.000Z');
 
     store({
       id: 'msg-2',
-      chat_jid: 'group@g.us',
-      sender: '111@s.whatsapp.net',
+      chat_jid: 'group',
+      sender: '111',
       sender_name: 'Dave',
       content: '',
       timestamp: '2024-01-01T00:00:04.000Z',
     });
 
     const messages = getMessagesSince(
-      'group@g.us',
+      'group',
       '2024-01-01T00:00:00.000Z',
       'Andy',
     );
@@ -86,12 +86,12 @@ describe('storeMessage', () => {
   });
 
   it('stores is_from_me flag', () => {
-    storeChatMetadata('group@g.us', '2024-01-01T00:00:00.000Z');
+    storeChatMetadata('group', '2024-01-01T00:00:00.000Z');
 
     store({
       id: 'msg-3',
-      chat_jid: 'group@g.us',
-      sender: 'me@s.whatsapp.net',
+      chat_jid: 'group',
+      sender: 'me',
       sender_name: 'Me',
       content: 'my message',
       timestamp: '2024-01-01T00:00:05.000Z',
@@ -100,7 +100,7 @@ describe('storeMessage', () => {
 
     // Message is stored (we can retrieve it — is_from_me doesn't affect retrieval)
     const messages = getMessagesSince(
-      'group@g.us',
+      'group',
       '2024-01-01T00:00:00.000Z',
       'Andy',
     );
@@ -108,12 +108,12 @@ describe('storeMessage', () => {
   });
 
   it('upserts on duplicate id+chat_jid', () => {
-    storeChatMetadata('group@g.us', '2024-01-01T00:00:00.000Z');
+    storeChatMetadata('group', '2024-01-01T00:00:00.000Z');
 
     store({
       id: 'msg-dup',
-      chat_jid: 'group@g.us',
-      sender: '123@s.whatsapp.net',
+      chat_jid: 'group',
+      sender: '123',
       sender_name: 'Alice',
       content: 'original',
       timestamp: '2024-01-01T00:00:01.000Z',
@@ -121,15 +121,15 @@ describe('storeMessage', () => {
 
     store({
       id: 'msg-dup',
-      chat_jid: 'group@g.us',
-      sender: '123@s.whatsapp.net',
+      chat_jid: 'group',
+      sender: '123',
       sender_name: 'Alice',
       content: 'updated',
       timestamp: '2024-01-01T00:00:01.000Z',
     });
 
     const messages = getMessagesSince(
-      'group@g.us',
+      'group',
       '2024-01-01T00:00:00.000Z',
       'Andy',
     );
@@ -142,28 +142,28 @@ describe('storeMessage', () => {
 
 describe('getMessagesSince', () => {
   beforeEach(() => {
-    storeChatMetadata('group@g.us', '2024-01-01T00:00:00.000Z');
+    storeChatMetadata('group', '2024-01-01T00:00:00.000Z');
 
     store({
       id: 'm1',
-      chat_jid: 'group@g.us',
-      sender: 'Alice@s.whatsapp.net',
+      chat_jid: 'group',
+      sender: 'Alice',
       sender_name: 'Alice',
       content: 'first',
       timestamp: '2024-01-01T00:00:01.000Z',
     });
     store({
       id: 'm2',
-      chat_jid: 'group@g.us',
-      sender: 'Bob@s.whatsapp.net',
+      chat_jid: 'group',
+      sender: 'Bob',
       sender_name: 'Bob',
       content: 'second',
       timestamp: '2024-01-01T00:00:02.000Z',
     });
     storeMessage({
       id: 'm3',
-      chat_jid: 'group@g.us',
-      sender: 'Bot@s.whatsapp.net',
+      chat_jid: 'group',
+      sender: 'Bot',
       sender_name: 'Bot',
       content: 'bot reply',
       timestamp: '2024-01-01T00:00:03.000Z',
@@ -171,8 +171,8 @@ describe('getMessagesSince', () => {
     });
     store({
       id: 'm4',
-      chat_jid: 'group@g.us',
-      sender: 'Carol@s.whatsapp.net',
+      chat_jid: 'group',
+      sender: 'Carol',
       sender_name: 'Carol',
       content: 'third',
       timestamp: '2024-01-01T00:00:04.000Z',
@@ -181,7 +181,7 @@ describe('getMessagesSince', () => {
 
   it('returns messages after the given timestamp', () => {
     const msgs = getMessagesSince(
-      'group@g.us',
+      'group',
       '2024-01-01T00:00:02.000Z',
       'Andy',
     );
@@ -193,7 +193,7 @@ describe('getMessagesSince', () => {
 
   it('includes bot messages via is_bot_message flag', () => {
     const msgs = getMessagesSince(
-      'group@g.us',
+      'group',
       '2024-01-01T00:00:00.000Z',
       'Andy',
     );
@@ -202,7 +202,7 @@ describe('getMessagesSince', () => {
   });
 
   it('returns all messages when sinceTimestamp is empty', () => {
-    const msgs = getMessagesSince('group@g.us', '', 'Andy');
+    const msgs = getMessagesSince('group', '', 'Andy');
     // 4 messages (including bot message)
     expect(msgs).toHaveLength(4);
   });
@@ -211,14 +211,14 @@ describe('getMessagesSince', () => {
     // Simulate a message written before migration: has prefix but is_bot_message = 0
     store({
       id: 'm5',
-      chat_jid: 'group@g.us',
-      sender: 'Bot@s.whatsapp.net',
+      chat_jid: 'group',
+      sender: 'Bot',
       sender_name: 'Bot',
       content: 'Andy: old bot reply',
       timestamp: '2024-01-01T00:00:05.000Z',
     });
     const msgs = getMessagesSince(
-      'group@g.us',
+      'group',
       '2024-01-01T00:00:04.000Z',
       'Andy',
     );
@@ -230,29 +230,29 @@ describe('getMessagesSince', () => {
 
 describe('getNewMessages', () => {
   beforeEach(() => {
-    storeChatMetadata('group1@g.us', '2024-01-01T00:00:00.000Z');
-    storeChatMetadata('group2@g.us', '2024-01-01T00:00:00.000Z');
+    storeChatMetadata('group1', '2024-01-01T00:00:00.000Z');
+    storeChatMetadata('group2', '2024-01-01T00:00:00.000Z');
 
     store({
       id: 'a1',
-      chat_jid: 'group1@g.us',
-      sender: 'user@s.whatsapp.net',
+      chat_jid: 'group1',
+      sender: 'user',
       sender_name: 'User',
       content: 'g1 msg1',
       timestamp: '2024-01-01T00:00:01.000Z',
     });
     store({
       id: 'a2',
-      chat_jid: 'group2@g.us',
-      sender: 'user@s.whatsapp.net',
+      chat_jid: 'group2',
+      sender: 'user',
       sender_name: 'User',
       content: 'g2 msg1',
       timestamp: '2024-01-01T00:00:02.000Z',
     });
     storeMessage({
       id: 'a3',
-      chat_jid: 'group1@g.us',
-      sender: 'user@s.whatsapp.net',
+      chat_jid: 'group1',
+      sender: 'user',
       sender_name: 'User',
       content: 'bot reply',
       timestamp: '2024-01-01T00:00:03.000Z',
@@ -260,8 +260,8 @@ describe('getNewMessages', () => {
     });
     store({
       id: 'a4',
-      chat_jid: 'group1@g.us',
-      sender: 'user@s.whatsapp.net',
+      chat_jid: 'group1',
+      sender: 'user',
       sender_name: 'User',
       content: 'g1 msg2',
       timestamp: '2024-01-01T00:00:04.000Z',
@@ -270,7 +270,7 @@ describe('getNewMessages', () => {
 
   it('returns new messages across multiple groups', () => {
     const { messages, newTimestamp } = getNewMessages(
-      ['group1@g.us', 'group2@g.us'],
+      ['group1', 'group2'],
       '',
       'Andy',
     );
@@ -281,7 +281,7 @@ describe('getNewMessages', () => {
 
   it('filters by timestamp', () => {
     const { messages } = getNewMessages(
-      ['group1@g.us', 'group2@g.us'],
+      ['group1', 'group2'],
       '2024-01-01T00:00:02.000Z',
       'Andy',
     );
@@ -302,30 +302,30 @@ describe('getNewMessages', () => {
 
 describe('storeChatMetadata', () => {
   it('stores chat with JID as default name', () => {
-    storeChatMetadata('group@g.us', '2024-01-01T00:00:00.000Z');
+    storeChatMetadata('group', '2024-01-01T00:00:00.000Z');
     const chats = getAllChats();
     expect(chats).toHaveLength(1);
-    expect(chats[0].jid).toBe('group@g.us');
-    expect(chats[0].name).toBe('group@g.us');
+    expect(chats[0].jid).toBe('group');
+    expect(chats[0].name).toBe('group');
   });
 
   it('stores chat with explicit name', () => {
-    storeChatMetadata('group@g.us', '2024-01-01T00:00:00.000Z', 'My Group');
+    storeChatMetadata('group', '2024-01-01T00:00:00.000Z', 'My Group');
     const chats = getAllChats();
     expect(chats[0].name).toBe('My Group');
   });
 
   it('updates name on subsequent call with name', () => {
-    storeChatMetadata('group@g.us', '2024-01-01T00:00:00.000Z');
-    storeChatMetadata('group@g.us', '2024-01-01T00:00:01.000Z', 'Updated Name');
+    storeChatMetadata('group', '2024-01-01T00:00:00.000Z');
+    storeChatMetadata('group', '2024-01-01T00:00:01.000Z', 'Updated Name');
     const chats = getAllChats();
     expect(chats).toHaveLength(1);
     expect(chats[0].name).toBe('Updated Name');
   });
 
   it('preserves newer timestamp on conflict', () => {
-    storeChatMetadata('group@g.us', '2024-01-01T00:00:05.000Z');
-    storeChatMetadata('group@g.us', '2024-01-01T00:00:01.000Z');
+    storeChatMetadata('group', '2024-01-01T00:00:05.000Z');
+    storeChatMetadata('group', '2024-01-01T00:00:01.000Z');
     const chats = getAllChats();
     expect(chats[0].last_message_time).toBe('2024-01-01T00:00:05.000Z');
   });
@@ -338,7 +338,7 @@ describe('task CRUD', () => {
     createTask({
       id: 'task-1',
       group_folder: 'main',
-      chat_jid: 'group@g.us',
+      chat_jid: 'group',
       prompt: 'do something',
       schedule_type: 'once',
       schedule_value: '2024-06-01T00:00:00.000Z',
@@ -358,7 +358,7 @@ describe('task CRUD', () => {
     createTask({
       id: 'task-2',
       group_folder: 'main',
-      chat_jid: 'group@g.us',
+      chat_jid: 'group',
       prompt: 'test',
       schedule_type: 'once',
       schedule_value: '2024-06-01T00:00:00.000Z',
@@ -376,7 +376,7 @@ describe('task CRUD', () => {
     createTask({
       id: 'task-3',
       group_folder: 'main',
-      chat_jid: 'group@g.us',
+      chat_jid: 'group',
       prompt: 'delete me',
       schedule_type: 'once',
       schedule_value: '2024-06-01T00:00:00.000Z',

@@ -24,7 +24,7 @@ Instead of application-level permission systems trying to prevent agents from ac
 
 ### Built for One User
 
-This isn't a framework or a platform. It's working software for my specific needs. I use WhatsApp and Email, so it supports WhatsApp and Email. I don't use Telegram, so it doesn't support Telegram. I add the integrations I actually want, not every possible integration.
+This isn't a framework or a platform. It's working software for my specific needs. I use Discord and Email, so it supports Discord and Email. I don't use Telegram, so it doesn't support Telegram. I add the integrations I actually want, not every possible integration.
 
 ### Customization = Code Changes
 
@@ -38,7 +38,7 @@ The codebase assumes you have an AI collaborator. It doesn't need to be excessiv
 
 ### Skills Over Features
 
-When people contribute, they shouldn't add "Telegram support alongside WhatsApp." They should contribute a skill like `/add-telegram` that transforms the codebase. Users fork the repo, run skills to customize, and end up with clean code that does exactly what they need - not a bloated system trying to support everyone's use case simultaneously.
+When people contribute, they shouldn't add "Telegram support alongside Discord." They should contribute a skill like `/add-telegram` that transforms the codebase. Users fork the repo, run skills to customize, and end up with clean code that does exactly what they need - not a bloated system trying to support everyone's use case simultaneously.
 
 ---
 
@@ -50,9 +50,8 @@ Skills we'd like contributors to build:
 Skills to add or switch to different messaging platforms:
 - `/add-telegram` - Add Telegram as an input channel
 - `/add-slack` - Add Slack as an input channel
-- `/add-discord` - Add Discord as an input channel
 - `/add-sms` - Add SMS via Twilio or similar
-- `/convert-to-telegram` - Replace WhatsApp with Telegram entirely
+- `/convert-to-telegram` - Replace Discord with Telegram entirely
 
 ### Container Runtime
 The project uses Docker by default (cross-platform). For macOS users who prefer Apple Container:
@@ -66,19 +65,19 @@ The project uses Docker by default (cross-platform). For macOS users who prefer 
 
 ## Vision
 
-A personal Gemini assistant accessible via WhatsApp, with minimal custom code.
+A personal Gemini assistant accessible via Discord, with minimal custom code.
 
 **Core components:**
 - **Gemini API** as the core agent
 - **Containers** for isolated agent execution (Linux VMs)
-- **WhatsApp** as the primary I/O channel
+- **Discord** as the primary I/O channel
 - **Persistent memory** per conversation and globally
 - **Scheduled tasks** that run Gemini and can message back
 - **Web access** for search and browsing
 - **Browser automation** via agent-browser
 
 **Implementation approach:**
-- Use existing tools (WhatsApp connector, Gemini API, MCP servers)
+- Use existing tools (Discord connector, Gemini API, MCP servers)
 - Minimal glue code
 - File-based systems where possible (GEMINI.md for memory, folders for groups)
 
@@ -87,14 +86,14 @@ A personal Gemini assistant accessible via WhatsApp, with minimal custom code.
 ## Architecture Decisions
 
 ### Message Routing
-- A router listens to WhatsApp and routes messages based on configuration
-- Only messages from registered groups are processed
+- A router listens to Discord and routes messages based on configuration
+- Only messages from registered groups/channels are processed
 - Trigger: `@Andy` prefix (case insensitive), configurable via `ASSISTANT_NAME` env var
 - Unregistered groups are ignored completely
 
 ### Memory System
 - **Per-group memory**: Each group has a folder with its own `GEMINI.md`
-- **Global memory**: Root `GEMINI.md` is read by all groups, but only writable from "main" (self-chat)
+- **Global memory**: Root `GEMINI.md` is read by all groups, but only writable from "main" (private channel)
 - **Files**: Groups can create/read files in their folder and reference them
 - Agent runs in the group's folder, automatically inherits both GEMINI.md files
 
@@ -126,7 +125,7 @@ A personal Gemini assistant accessible via WhatsApp, with minimal custom code.
 - Groups can have additional directories mounted via `containerConfig`
 
 ### Main Channel Privileges
-- Main channel is the admin/control group (typically self-chat)
+- Main channel is the admin/control group (typically your private Discord channel)
 - Can write to global memory (`groups/GEMINI.md`)
 - Can schedule tasks for any group
 - Can view and manage tasks from all groups
@@ -136,10 +135,10 @@ A personal Gemini assistant accessible via WhatsApp, with minimal custom code.
 
 ## Integration Points
 
-### WhatsApp
-- Using baileys library for WhatsApp Web connection
+### Discord
+- Using discord.js library for connection
 - Messages stored in SQLite, polled by router
-- QR code authentication during setup
+- Token-based authentication
 
 ### Scheduler
 - Built-in scheduler runs on the host, spawns containers for task execution
@@ -170,7 +169,6 @@ A personal Gemini assistant accessible via WhatsApp, with minimal custom code.
 - Each user gets a custom setup matching their exact needs
 
 ### Skills
-- `/setup` - Install dependencies, authenticate WhatsApp, configure scheduler, start services
 - `/customize` - General-purpose skill for adding capabilities (new channels like Telegram, new integrations, behavior changes)
 - `/update` - Pull upstream changes, merge with customizations, run migrations
 
@@ -187,7 +185,7 @@ These are the creator's settings, stored here for reference:
 - **Trigger**: `@Andy` (case insensitive)
 - **Response prefix**: `Andy:`
 - **Persona**: Default Gemini (no custom personality)
-- **Main channel**: Self-chat (messaging yourself in WhatsApp)
+- **Main channel**: Private Discord channel (direct message or dedicated channel)
 
 ---
 

@@ -215,7 +215,7 @@ const toolDeclarations = [
   },
   {
     name: 'send_message',
-    description: 'Send a message to a WhatsApp user or another agent.',
+    description: 'Send a message to a user or another agent.',
     parameters: {
       type: 'OBJECT' as const,
       properties: {
@@ -264,6 +264,36 @@ const toolDeclarations = [
         },
       },
       required: ['prompt', 'schedule_type', 'schedule_value'],
+    },
+  },
+  {
+    name: 'create_discord_thread',
+    description: 'Create a new Discord thread and bind an autonomous sub-agent to it. Returns the URL of the new thread. Use this to create dedicated workspaces for specialized tasks or human collaboration.',
+    parameters: {
+      type: 'OBJECT' as const,
+      properties: {
+        name: {
+          type: 'STRING' as const,
+          description: 'The name of the thread to create',
+        },
+        parentJid: {
+          type: 'STRING' as const,
+          description: 'The JID of the parent Discord channel (e.g. discord-123456789). Use the chatJid of the current context if you want to create a thread here.',
+        },
+        folder: {
+          type: 'STRING' as const,
+          description: 'The folder name for the sub-agent (e.g. "researcher-bot")',
+        },
+        systemInstruction: {
+          type: 'STRING' as const,
+          description: 'The system instructions (brain) for the new sub-agent. Must include Safety Protocol if it codes.',
+        },
+        ephemeral: {
+          type: 'BOOLEAN' as const,
+          description: 'If true, the sub-agent and its files will be deleted when delete_group is called. Default is true.',
+        }
+      },
+      required: ['name', 'parentJid', 'folder', 'systemInstruction'],
     },
   },
   {
@@ -353,6 +383,20 @@ const toolDeclarations = [
         jid: {
           type: 'STRING' as const,
           description: 'The unique identifier (JID) of the group to delete',
+        },
+      },
+      required: ['jid'],
+    },
+  },
+  {
+    name: 'delete_discord_thread',
+    description: 'Deletes an autonomous sub-agent AND physically deletes its associated Discord thread. Use this to fully clean up a dynamic workspace created with create_discord_thread when the task is complete.',
+    parameters: {
+      type: 'OBJECT' as const,
+      properties: {
+        jid: {
+          type: 'STRING' as const,
+          description: 'The unique identifier (JID) of the Discord thread and group to delete (e.g. discord-123456789)',
         },
       },
       required: ['jid'],
@@ -568,6 +612,18 @@ const getFunctions = (
     });
     return `Task scheduled for ${finalTargetJid}: ${schedule_type} ${schedule_value}`;
   },
+  create_discord_thread: ({ name, parentJid, folder, systemInstruction, ephemeral }) => {
+    writeIpcFile(TASKS_DIR, {
+      type: 'create_discord_thread',
+      name,
+      parentJid,
+      folder,
+      systemInstruction,
+      ephemeral: ephemeral ?? true,
+      chatJid: input.chatJid,
+    });
+    return `Requested creation of Discord thread '${name}' with sub-agent in folder '${folder}'. The orchestrator will send a follow-up message with the thread URL once it is created.`;
+  },
   rebuild_self: ({ imageTag, resumptionPrompt }) => {
     writeIpcFile(TASKS_DIR, {
       type: 'rebuild_self',
@@ -620,6 +676,15 @@ const getFunctions = (
       timestamp: new Date().toISOString(),
     });
     return `Group deletion requested for JID ${jid}.`;
+  },
+  delete_discord_thread: ({ jid }) => {
+    writeIpcFile(TASKS_DIR, {
+      type: 'delete_discord_thread',
+      jid,
+      sourceGroup: input.groupFolder,
+      timestamp: new Date().toISOString(),
+    });
+    return `Physical thread deletion and sub-agent cleanup requested for JID ${jid}.`;
   },
   list_groups: () => {
     const groupsFile = '/workspace/ipc/available_groups.json';

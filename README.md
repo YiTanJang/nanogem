@@ -54,9 +54,9 @@ Then run `/setup`. Gemini CLI handles everything: dependencies, authentication, 
 
 ## What It Supports
 
-- **Messenger I/O** - Message NanoClaw from your phone. Supports WhatsApp, Telegram, Discord, Slack, Signal and headless operation.
+- **Messenger I/O** - Message NanoClaw from your phone via Discord.
 - **Isolated group context** - Each group has its own `GEMINI.md` memory, isolated filesystem, and runs in its own container sandbox with only that filesystem mounted to it.
-- **Main channel** - Your private channel (self-chat) for admin control; every group is completely isolated
+- **Main channel** - Your private Discord channel for admin control; every group is completely isolated
 - **Scheduled tasks** - Recurring jobs that run Gemini and can message you back
 - **Web access** - Search and fetch content from the Web
 - **Container isolation** - Agents are sandboxed in Apple Container (macOS), Docker (macOS/Linux), or Kubernetes
@@ -73,7 +73,7 @@ Talk to your assistant with the trigger word (default: `@Andy`):
 @Andy every Monday at 8am, compile news on AI developments from Hacker News and TechCrunch and message me a briefing
 ```
 
-From the main channel (your self-chat), you can manage groups and tasks:
+From the main channel (your private Discord channel), you can manage groups and tasks:
 ```
 @Andy list all scheduled tasks across groups
 @Andy pause the Monday briefing task
@@ -89,15 +89,13 @@ NanoClaw doesn't use configuration files. To make changes, just tell Gemini CLI 
 - "Add a custom greeting when I say good morning"
 - "Store conversation summaries weekly"
 
-Or run `/customize` for guided changes.
-
 The codebase is small enough that Gemini can safely modify it.
 
 ## Contributing
 
 **Don't add features. Add skills.**
 
-If you want to add Telegram support, don't create a PR that adds Telegram alongside WhatsApp. Instead, contribute a skill file (`.gemini/skills/add-telegram/SKILL.md`) that teaches Gemini CLI how to transform a NanoClaw installation to use Telegram.
+If you want to add Telegram support, don't create a PR that adds Telegram alongside Discord. Instead, contribute a skill file (`.gemini/skills/add-telegram/SKILL.md`) that teaches Gemini CLI how to transform a NanoClaw installation to use Telegram.
 
 Users then run `/add-telegram` on their fork and get clean code that does exactly what they need, not a bloated system trying to support every use case.
 
@@ -121,14 +119,14 @@ Skills we'd like to see:
 ## Architecture
 
 ```
-WhatsApp (baileys) --> SQLite --> Polling loop --> Container/Pod (Gemini API) --> Response
+Discord --> SQLite --> Polling loop --> Container/Pod (Gemini API) --> Response
 ```
 
 Single Node.js process. Agents execute in isolated Linux containers or Kubernetes pods with filesystem isolation. Only mounted directories are accessible. Per-group message queue with concurrency control. IPC via filesystem.
 
 Key files:
 - `src/index.ts` - Orchestrator: state, message loop, agent invocation
-- `src/channels/whatsapp.ts` - WhatsApp connection, auth, send/receive
+- `src/channels/discord.ts` - Discord connection, auth, send/receive
 - `src/ipc.ts` - IPC watcher and task processing
 - `src/router.ts` - Message formatting and outbound routing
 - `src/group-queue.ts` - Per-group queue with global concurrency limit

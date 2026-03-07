@@ -1,6 +1,6 @@
 # NanoClaw Specification
 
-A personal Gemini assistant accessible via WhatsApp, with persistent memory per conversation, scheduled tasks, and email integration.
+A personal Gemini assistant accessible via Discord, with persistent memory per conversation, scheduled tasks, and containerized agent execution.
 
 ---
 
@@ -24,13 +24,13 @@ A personal Gemini assistant accessible via WhatsApp, with persistent memory per 
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        HOST (macOS)                                  │
+│                        HOST (Linux/macOS)                            │
 │                   (Main Node.js Process)                             │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌──────────────┐                     ┌────────────────────┐        │
-│  │  WhatsApp    │────────────────────▶│   SQLite Database  │        │
-│  │  (baileys)   │◀────────────────────│   (messages.db)    │        │
+│  │   Discord    │────────────────────▶│   SQLite Database  │        │
+│  │ (discord.js) │◀────────────────────│   (messages.db)    │        │
 │  └──────────────┘   store/send        └─────────┬──────────┘        │
 │                                                  │                   │
 │         ┌────────────────────────────────────────┘                   │
@@ -42,10 +42,10 @@ A personal Gemini assistant accessible via WhatsApp, with persistent memory per 
 │  └────────┬─────────┘    └────────┬─────────┘    └───────────────┘  │
 │           │                       │                                  │
 │           └───────────┬───────────┘                                  │
-│                       │ spawns container                             │
+│                       │ spawns container/pod                         │
 │                       ▼                                              │
 ├─────────────────────────────────────────────────────────────────────┤
-│                     CONTAINER (Linux VM)                              │
+│                CONTAINER / KUBERNETES POD                            │
 ├─────────────────────────────────────────────────────────────────────┤
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │                    AGENT RUNNER                               │   │
@@ -73,9 +73,9 @@ A personal Gemini assistant accessible via WhatsApp, with persistent memory per 
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| WhatsApp Connection | Node.js (@whiskeysockets/baileys) | Connect to WhatsApp, send/receive messages |
-| Message Storage | SQLite (better-sqlite3) | Store messages for polling |
-| Container Runtime | Containers (Docker/Kubernetes) | Isolated environments for agent execution |
+| Messaging Channel | Node.js (discord.js) | Connect to Discord, send/receive messages |
+| Message Storage | SQLite (better-sqlite3) | Store messages for polling and history |
+| Container Runtime | Docker / Kubernetes | Isolated environments for agent execution |
 | Agent | Gemini API | Run Gemini with tools and functions |
 | Browser Automation | agent-browser + Chromium | Web interaction and screenshots |
 | Runtime | Node.js 20+ | Host process for routing and scheduling |
@@ -100,7 +100,7 @@ nanoclaw/
 ├── src/
 │   ├── index.ts                   # Orchestrator: state, message loop, agent invocation
 │   ├── channels/
-│   │   └── whatsapp.ts            # WhatsApp connection, auth, send/receive
+│   │   └── discord.ts             # Discord connection, auth, send/receive
 │   ├── ipc.ts                     # IPC watcher and task processing
 │   ├── router.ts                  # Message formatting and outbound routing
 │   ├── config.ts                  # Configuration constants
@@ -109,9 +109,9 @@ nanoclaw/
 │   ├── db.ts                      # SQLite database initialization and queries
 │   ├── group-queue.ts             # Per-group queue with global concurrency limit
 │   ├── mount-security.ts          # Mount allowlist validation for containers
-│   ├── whatsapp-auth.ts           # Standalone WhatsApp authentication
 │   ├── task-scheduler.ts          # Runs scheduled tasks when due
-│   └── container-runner.ts        # Spawns agents in containers
+│   ├── k8s-runtime.ts             # Native Kubernetes pod management
+│   └── container-runner.ts        # Spawns agents in containers/pods
 │
 ├── container/
 │   ├── Dockerfile                 # Container image (runs as 'node' user)
@@ -129,19 +129,17 @@ nanoclaw/
 │
 ├── .gemini/
 │   └── skills/
-│       ├── setup/SKILL.md              # /setup - First-time installation
 │       ├── customize/SKILL.md          # /customize - Add capabilities
 │       ├── debug/SKILL.md              # /debug - Container debugging
 │       ├── add-telegram/SKILL.md       # /add-telegram - Telegram channel
 │       ├── add-gmail/SKILL.md          # /add-gmail - Gmail integration
 │       ├── add-voice-transcription/    # /add-voice-transcription - Whisper
 │       ├── x-integration/SKILL.md      # /x-integration - X/Twitter
-│       ├── convert-to-apple-container/  # /convert-to-apple-container - Apple Container runtime
 │       └── add-parallel/SKILL.md       # /add-parallel - Parallel agents
 │
 ├── groups/
 │   ├── GEMINI.md                  # Global memory (all groups read this)
-│   ├── main/                      # Self-chat (main control channel)
+│   ├── main/                      # Main control channel folder
 │   │   ├── GEMINI.md              # Main channel memory
 │   │   └── logs/                  # Task execution logs
 │   └── {Group Name}/              # Per-group folders (created on registration)
@@ -150,7 +148,6 @@ nanoclaw/
 │       └── *.md                   # Files created by the agent
 │
 ├── store/                         # Local data (gitignored)
-│   ├── auth/                      # WhatsApp authentication state
 │   └── messages.db                # SQLite database (messages, chats, scheduled_tasks, task_run_logs, registered_groups, sessions, router_state)
 │
 ├── data/                          # Application state (gitignored)
@@ -161,7 +158,6 @@ nanoclaw/
 ├── logs/                          # Runtime logs (gitignored)
 │   ├── nanoclaw.log               # Host stdout
 │   └── nanoclaw.error.log         # Host stderr
-│   # Note: Per-container logs are in groups/{folder}/logs/container-*.log
 │
 └── launchd/
     └── com.nanoclaw.plist         # macOS service configuration
@@ -176,7 +172,7 @@ Configuration constants are in `src/config.ts`:
 ```typescript
 import path from 'path';
 
-export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || 'Andy';
+export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || 'NanoClaw';
 export const POLL_INTERVAL = 2000;
 export const SCHEDULER_POLL_INTERVAL = 60000;
 
@@ -187,72 +183,35 @@ export const GROUPS_DIR = path.resolve(PROJECT_ROOT, 'groups');
 export const DATA_DIR = path.resolve(PROJECT_ROOT, 'data');
 
 // Container configuration
+export const CONTAINER_RUNTIME = process.env.CONTAINER_RUNTIME || 'docker'; // 'docker' or 'k8s'
 export const CONTAINER_IMAGE = process.env.CONTAINER_IMAGE || 'nanoclaw-agent:latest';
-export const CONTAINER_TIMEOUT = parseInt(process.env.CONTAINER_TIMEOUT || '1800000', 10); // 30min default
-export const IPC_POLL_INTERVAL = 1000;
-export const IDLE_TIMEOUT = parseInt(process.env.IDLE_TIMEOUT || '1800000', 10); // 30min — keep container alive after last result
-export const MAX_CONCURRENT_CONTAINERS = Math.max(1, parseInt(process.env.MAX_CONCURRENT_CONTAINERS || '5', 10) || 5);
+export const CONTAINER_TIMEOUT = parseInt(process.env.CONTAINER_TIMEOUT || '1800000', 10);
+export const MAX_CONCURRENT_CONTAINERS = parseInt(process.env.MAX_CONCURRENT_CONTAINERS || '5', 10);
 
 export const TRIGGER_PATTERN = new RegExp(`^@${ASSISTANT_NAME}\\b`, 'i');
 ```
 
-**Note:** Paths must be absolute for container volume mounts to work correctly.
-
 ### Container Configuration
 
-Groups can have additional directories mounted via `containerConfig` in the SQLite `registered_groups` table (stored as JSON in the `container_config` column). Example registration:
+Groups can have additional directories mounted via `containerConfig` in the SQLite `registered_groups` table. Example registration:
 
 ```typescript
-registerGroup("1234567890@g.us", {
-  name: "Dev Team",
-  folder: "dev-team",
-  trigger: "@Andy",
+registerGroup("discord-123456789", {
+  name: "Project Alpha",
+  folder: "project-alpha",
+  trigger: "@NanoClaw",
   added_at: new Date().toISOString(),
   containerConfig: {
     additionalMounts: [
       {
-        hostPath: "~/projects/webapp",
-        containerPath: "webapp",
+        hostPath: "/path/to/project",
+        containerPath: "project",
         readonly: false,
       },
     ],
-    timeout: 600000,
   },
 });
 ```
-
-Additional mounts appear at `/workspace/extra/{containerPath}` inside the container.
-
-**Mount syntax note:** Read-write mounts use `-v host:container`, but readonly mounts require `--mount "type=bind,source=...,target=...,readonly"` (the `:ro` suffix may not work on all runtimes).
-
-### Gemini Authentication
-
-Configure authentication in a `.env` file in the project root.
-
-```bash
-GEMINI_API_KEY=AIzaSy...
-```
-
-Only the `GEMINI_API_KEY` is extracted from `.env` and written to `data/env/env`, then mounted into the container at `/workspace/env-dir/env` and sourced by the entrypoint script. This ensures other environment variables in `.env` are not exposed to the agent. This workaround is needed because some container runtimes lose `-e` environment variables when using `-i` (interactive mode with piped stdin).
-
-### Changing the Assistant Name
-
-Set the `ASSISTANT_NAME` environment variable:
-
-```bash
-ASSISTANT_NAME=Bot npm start
-```
-
-Or edit the default in `src/config.ts`. This changes:
-- The trigger pattern (messages must start with `@YourName`)
-- The response prefix (`YourName:` added automatically)
-
-### Placeholder Values in launchd
-
-Files with `{{PLACEHOLDER}}` values need to be configured:
-- `{{PROJECT_ROOT}}` - Absolute path to your nanoclaw installation
-- `{{NODE_PATH}}` - Path to node binary (detected via `which node`)
-- `{{HOME}}` - User's home directory
 
 ---
 
@@ -264,41 +223,9 @@ NanoClaw uses a hierarchical memory system based on GEMINI.md files.
 
 | Level | Location | Read By | Written By | Purpose |
 |-------|----------|---------|------------|---------|
-| **Global** | `groups/GEMINI.md` | All groups | Main only | Preferences, facts, context shared across all conversations |
+| **Global** | `groups/GEMINI.md` | All groups | Main only | Preferences, context shared across all conversations |
 | **Group** | `groups/{name}/GEMINI.md` | That group | That group | Group-specific context, conversation memory |
 | **Files** | `groups/{name}/*.md` | That group | That group | Notes, research, documents created during conversation |
-
-### How Memory Works
-
-1. **Agent Context Loading**
-   - Agent runs with `cwd` set to `groups/{group-name}/`
-   - Gemini agent automatically loads:
-     - `../GEMINI.md` (parent directory = global memory)
-     - `./GEMINI.md` (current directory = group memory)
-
-2. **Writing Memory**
-   - When user says "remember this", agent writes to `./GEMINI.md`
-   - When user says "remember this globally" (main channel only), agent writes to `../GEMINI.md`
-   - Agent can create files like `notes.md`, `research.md` in the group folder
-
-3. **Main Channel Privileges**
-   - Only the "main" group (self-chat) can write to global memory
-   - Main can manage registered groups and schedule tasks for any group
-   - Main can configure additional directory mounts for any group
-   - All groups have Bash access (safe because it runs inside container)
-
----
-
-## Session Management
-
-Sessions enable conversation continuity - Gemini remembers what you talked about.
-
-### How Sessions Work
-
-1. Each group has a session history stored in SQLite (`sessions` table, keyed by `group_folder`)
-2. Session history is passed to the Gemini agent
-3. Gemini continues the conversation with full context
-4. Session transcripts are stored as JSON files in `data/sessions/{group}/.gemini/`
 
 ---
 
@@ -307,10 +234,10 @@ Sessions enable conversation continuity - Gemini remembers what you talked about
 ### Incoming Message Flow
 
 ```
-1. User sends WhatsApp message
+1. User sends message via Discord (mention or DM)
    │
    ▼
-2. Baileys receives message via WhatsApp Web protocol
+2. discord.js receives message
    │
    ▼
 3. Message stored in SQLite (store/messages.db)
@@ -320,92 +247,42 @@ Sessions enable conversation continuity - Gemini remembers what you talked about
    │
    ▼
 5. Router checks:
-   ├── Is chat_jid in registered groups (SQLite)? → No: ignore
-   └── Does message match trigger pattern? → No: store but don't process
+   ├── Is channel registered? → No: ignore
+   └── Is it a trigger message? → No: store only
    │
    ▼
 6. Router catches up conversation:
    ├── Fetch all messages since last agent interaction
-   ├── Format with timestamp and sender name
    └── Build prompt with full conversation context
    │
    ▼
 7. Router invokes Gemini Agent:
+   ├── Spawns container or K8s pod
    ├── cwd: groups/{group-name}/
-   ├── prompt: conversation history + current message
-   └── resume: session history (for continuity)
+   └── resume: session history
    │
    ▼
-8. Gemini processes message:
-   ├── Reads GEMINI.md files for context
-   └── Uses tools as needed (search, email, etc.)
+8. Gemini processes message using tools
    │
    ▼
-9. Router prefixes response with assistant name and sends via WhatsApp
+9. Router sends response back to Discord channel
    │
    ▼
-10. Router updates last agent timestamp and saves session ID
+10. Update last agent timestamp and save session
 ```
-
-### Trigger Word Matching
-
-Messages must start with the trigger pattern (default: `@Andy`):
-- `@Andy what's the weather?` → ✅ Triggers Gemini
-- `@andy help me` → ✅ Triggers (case insensitive)
-- `Hey @Andy` → ❌ Ignored (trigger not at start)
-- `What's up?` → ❌ Ignored (no trigger)
-
-### Conversation Catch-Up
-
-When a triggered message arrives, the agent receives all messages since its last interaction in that chat. Each message is formatted with timestamp and sender name:
-
-```
-[Jan 31 2:32 PM] John: hey everyone, should we do pizza tonight?
-[Jan 31 2:33 PM] Sarah: sounds good to me
-[Jan 31 2:35 PM] John: @Andy what toppings do you recommend?
-```
-
-This allows the agent to understand the conversation context even if it wasn't mentioned in every message.
 
 ---
 
 ## Commands
 
-### Commands Available in Any Group
-
-| Command | Example | Effect |
-|---------|---------|--------|
-| `@Assistant [message]` | `@Andy what's the weather?` | Talk to Gemini |
-
 ### Commands Available in Main Channel Only
 
 | Command | Example | Effect |
 |---------|---------|--------|
-| `@Assistant add group "Name"` | `@Andy add group "Family Chat"` | Register a new group |
-| `@Assistant remove group "Name"` | `@Andy remove group "Work Team"` | Unregister a group |
+| `@Assistant add group "Name"` | `@Andy add group "Work Team"` | Register a new channel |
+| `@Assistant remove group "Name"` | `@Andy remove group "Old Project"` | Unregister a channel |
 | `@Assistant list groups` | `@Andy list groups` | Show registered groups |
-| `@Assistant remember [fact]` | `@Andy remember I prefer dark mode` | Add to global memory |
-
----
-
-## Scheduled Tasks
-
-NanoClaw has a built-in scheduler that runs tasks as full agents in their group's context.
-
-### How Scheduling Works
-
-1. **Group Context**: Tasks created in a group run with that group's working directory and memory
-2. **Full Agent Capabilities**: Scheduled tasks have access to all tools (WebSearch, file operations, etc.)
-3. **Optional Messaging**: Tasks can send messages to their group using the `send_message` tool, or complete silently
-4. **Main Channel Privileges**: The main channel can schedule tasks for any group and view all tasks
-
-### Schedule Types
-
-| Type | Value Format | Example |
-|------|--------------|---------|
-| `cron` | Cron expression | `0 9 * * 1` (Mondays at 9am) |
-| `interval` | Milliseconds | `3600000` (every hour) |
-| `once` | ISO timestamp | `2024-12-25T09:00:00Z` |
+| `@Assistant remember [fact]` | `@Andy remember I prefer Node.js` | Add to global memory |
 
 ---
 
@@ -413,24 +290,14 @@ NanoClaw has a built-in scheduler that runs tasks as full agents in their group'
 
 ### Container Isolation
 
-All agents run inside containers (lightweight Linux VMs), providing:
-- **Filesystem isolation**: Agents can only access mounted directories
-- **Safe Bash access**: Commands run inside the container, not on your host
-- **Network isolation**: Can be configured per-container if needed
-- **Process isolation**: Container processes can't affect the host
-- **Non-root user**: Container runs as unprivileged `node` user (uid 1000)
+All agents run inside isolated containers or pods:
+- **Filesystem isolation**: Agents only see mounted directories.
+- **Safe Bash access**: Commands run inside the sandbox, not on the host.
+- **Non-root user**: Container processes run as unprivileged `node` user.
 
 ### Prompt Injection Risk
 
-WhatsApp messages could contain malicious instructions attempting to manipulate Gemini's behavior.
-
-**Mitigations:**
-- Container isolation limits blast radius
-- Only registered groups are processed
-- Trigger word required (reduces accidental processing)
-- Agents can only access their group's mounted directories
-- Main can configure additional directories per group
-- Gemini's built-in safety training
+Discord messages could contain malicious instructions attempting to manipulate Gemini's behavior. Mitigation includes container isolation, required trigger words, and explicit group registration.
 
 ---
 
@@ -440,12 +307,11 @@ WhatsApp messages could contain malicious instructions attempting to manipulate 
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| No response to messages | Service not running | Check `launchctl list | grep nanoclaw` or `systemctl --user status nanoclaw` |
-| Container agent failed | GEMINI_API_KEY missing | Check your .env file or K8s secrets |
-| "QR code expired" | WhatsApp session expired | Delete store/auth/ and restart |
-| "No groups registered" | Haven't added groups | Use `@Andy add group "Name"` in main |
+| No response | Service not running | Check systemctl/launchctl status |
+| Container failed | Runtime missing | Ensure Docker or Kubernetes is running |
+| "Unauthorized" | Group not registered | Register the channel from main |
 
 ### Log Location
 
-- `logs/nanoclaw.log` - stdout
-- `logs/nanoclaw.error.log` - stderr
+- `logs/nanoclaw.log` - Host stdout
+- `logs/nanoclaw.error.log` - Host stderr

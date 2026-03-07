@@ -21,7 +21,7 @@ describe('task scheduler', () => {
     createTask({
       id: 'task-invalid-folder',
       group_folder: '../../outside',
-      chat_jid: 'bad@g.us',
+      chat_jid: 'bad',
       prompt: 'run',
       schedule_type: 'once',
       schedule_value: '2026-02-22T00:00:00.000Z',

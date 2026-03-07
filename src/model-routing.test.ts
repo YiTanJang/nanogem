@@ -60,7 +60,7 @@ describe('Model Routing', () => {
   };
 
   it('uses default model when no override is present', async () => {
-    await runAgent(testGroup as any, 'hello', '123@g.us');
+    await runAgent(testGroup as any, 'hello', '123');
 
     expect(containerRunner.runContainerAgent).toHaveBeenCalledWith(
       expect.anything(),
@@ -77,7 +77,7 @@ describe('Model Routing', () => {
     await runAgent(
       testGroup as any,
       '[model:gemini-2.5-pro] explain quantum',
-      '123@g.us',
+      '123',
     );
 
     expect(containerRunner.runContainerAgent).toHaveBeenCalledWith(
@@ -95,7 +95,7 @@ describe('Model Routing', () => {
     await runAgent(
       testGroup as any,
       '  [model:gemini-2.5-pro]   hello  ',
-      '123@g.us',
+      '123',
     );
 
     expect(containerRunner.runContainerAgent).toHaveBeenCalledWith(

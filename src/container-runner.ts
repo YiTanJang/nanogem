@@ -969,7 +969,15 @@ async function runAgentPod(
     // or to clean it up when it eventually exits.
     
     // Background the completion promise so it cleans up later
-    podCompletionPromise.catch(err => logger.debug({ err, podName }, 'Pod completion watcher error'));
+    podCompletionPromise
+      .then(() => {
+        logger.debug({ podName }, 'Pod completion promise resolved, triggering exit listeners');
+        exitListeners.forEach(l => l());
+      })
+      .catch(err => {
+        logger.debug({ err, podName }, 'Pod completion watcher error');
+        exitListeners.forEach(l => l());
+      });
     
     return await firstOutputPromise;
   } catch (err) {
@@ -1027,7 +1035,7 @@ export function writeGroupsSnapshot(
   const groupIpcDir = resolveGroupIpcPath(groupFolder);
   fs.mkdirSync(groupIpcDir, { recursive: true });
 
-  // 1. Start with discovered WhatsApp groups
+  // 1. Start with discovered groups
   const visibleGroups: AvailableGroup[] = groups.map(g => ({
     ...g,
     isRegistered: registeredJids.has(g.jid)

@@ -181,10 +181,10 @@ export class GroupQueue {
 
       if (needsTrigger) {
         // Standardize trigger check logic (matches src/index.ts)
-        const isWhatsApp = groupJid.endsWith('@g.us') || groupJid.endsWith('@s.whatsapp.net');
+        const isDiscord = groupJid.startsWith('discord-');
         const isInternalTarget = groupJid.startsWith('internal-');
         
-        const hasTriggerPattern = (isWhatsApp || isInternalTarget) && TRIGGER_PATTERN.test(text);
+        const hasTriggerPattern = (isDiscord || isInternalTarget) && TRIGGER_PATTERN.test(text);
         
         if (!isBotMessage && !hasTriggerPattern) {
           logger.debug({ groupJid }, 'Follow-up message ignored: trigger not matched');
@@ -247,8 +247,6 @@ export class GroupQueue {
           state.retryCount = 0;
         } else {
           // If the container failed to even start or provide first output, we don't keep it
-          state.active = false;
-          this.activeCount--;
           this.scheduleRetry(groupJid, state);
           return;
         }
@@ -274,8 +272,6 @@ export class GroupQueue {
 
     } catch (err) {
       logger.error({ groupJid, err }, 'Error processing messages for group');
-      state.active = false;
-      this.activeCount--;
       this.scheduleRetry(groupJid, state);
       return;
     } finally {
@@ -415,7 +411,6 @@ export class GroupQueue {
 
     // Count active containers but don't kill them — they'll finish on their own
     // via idle timeout or container timeout. The --rm flag cleans them up on exit.
-    // This prevents WhatsApp reconnection restarts from killing working agents.
     const activeContainers: string[] = [];
     for (const [jid, state] of this.groups) {
       if (state.process && !state.process.killed && state.containerName) {

@@ -56,14 +56,11 @@ Files like `package.json`, `docker-compose.yml`, `.env.example`, and generated c
 # In manifest.yaml
 structured:
   npm_dependencies:
-    whatsapp-web.js: "^2.1.0"
-    qrcode-terminal: "^0.12.0"
+    discord.js: "^14.14.0"
   env_additions:
-    - WHATSAPP_TOKEN
-    - WHATSAPP_VERIFY_TOKEN
-    - WHATSAPP_PHONE_ID
+    - DISCORD_BOT_TOKEN
   docker_compose_services:
-    whatsapp-redis:
+    redis:
       image: redis:alpine
       ports: ["6380:6379"]
 ```
@@ -101,27 +98,26 @@ A skill contains only the files it adds or modifies. For modified code files, th
 
 ```
 skills/
-  add-whatsapp/
+  add-telegram/
     SKILL.md                          # Context, intent, what this skill does and why
     manifest.yaml                     # Metadata, dependencies, env vars, post-apply steps
     tests/                            # Integration tests for this skill
-      whatsapp.test.ts
+      telegram.test.ts
     add/                              # New files — copied directly
-      src/channels/whatsapp.ts
-      src/channels/whatsapp.config.ts
+      src/channels/telegram.ts
     modify/                           # Modified code files — merged via git merge-file
       src/
-        server.ts                     # Full file: clean core + whatsapp changes
-        server.ts.intent.md           # "Adds WhatsApp webhook route and message handler"
-        config.ts                     # Full file: clean core + whatsapp config options
-        config.ts.intent.md           # "Adds WhatsApp channel configuration block"
+        index.ts                      # Full file: clean core + telegram changes
+        index.ts.intent.md            # "Adds Telegram message handler"
+        config.ts                     # Full file: clean core + telegram config options
+        config.ts.intent.md           # "Adds Telegram channel configuration block"
 ```
 
 ### Why Full Modified Files
 
 - `git merge-file` requires three full files — no intermediate reconstruction step
 - Git's three-way merge uses context matching, so it works even if the user has moved code around — unlike line-number-based diffs that break immediately
-- Auditable: `diff .nanoclaw/base/src/server.ts skills/add-whatsapp/modify/src/server.ts` shows exactly what the skill changes
+- Auditable: `diff .nanoclaw/base/src/index.ts skills/add-telegram/modify/src/index.ts` shows exactly what the skill changes
 - Deterministic: same three inputs always produce the same merge result
 - Size is negligible since NanoClaw's core files are small
 
@@ -130,22 +126,21 @@ skills/
 Each modified code file has a corresponding `.intent.md` with structured headings:
 
 ```markdown
-# Intent: server.ts modifications
+# Intent: index.ts modifications
 
 ## What this skill adds
-Adds WhatsApp webhook route and message handler to the Express server.
+Adds Telegram message handler to the main orchestrator.
 
 ## Key sections
-- Route registration at `/webhook/whatsapp` (POST and GET for verification)
-- Message handler middleware between auth and response pipeline
+- Route registration for Telegram messages
+- Message handler integration in the main loop
 
 ## Invariants
-- Must not interfere with other channel webhook routes
-- Auth middleware must run before the WhatsApp handler
-- Error handling must propagate to the global error handler
+- Must not interfere with other channel handlers
+- Error handling must propagate to the global logger
 
 ## Must-keep sections
-- The webhook verification flow (GET route) is required by WhatsApp Cloud API
+- Core message queue logic must remain intact
 ```
 
 Structured headings (What, Key sections, Invariants, Must-keep) give Gemini CLI specific guidance during conflict resolution instead of requiring it to infer from unstructured text.
@@ -154,19 +149,18 @@ Structured headings (What, Key sections, Invariants, Must-keep) give Gemini CLI 
 
 ```yaml
 # --- Required fields ---
-skill: whatsapp
+skill: telegram
 version: 1.2.0
-description: "WhatsApp Business API integration via Cloud API"
+description: "Telegram Bot API integration"
 core_version: 0.1.0               # The core version this skill was authored against
 
 # Files this skill adds
 adds:
-  - src/channels/whatsapp.ts
-  - src/channels/whatsapp.config.ts
+  - src/channels/telegram.ts
 
 # Code files this skill modifies (three-way merge)
 modifies:
-  - src/server.ts
+  - src/index.ts
   - src/config.ts
 
 # File operations (renames, deletes, moves — see Section 5)
@@ -175,19 +169,16 @@ file_ops: []
 # Structured operations (deterministic, no merge — implicit handling)
 structured:
   npm_dependencies:
-    whatsapp-web.js: "^2.1.0"
-    qrcode-terminal: "^0.12.0"
+    grammy: "^1.20.0"
   env_additions:
-    - WHATSAPP_TOKEN
-    - WHATSAPP_VERIFY_TOKEN
-    - WHATSAPP_PHONE_ID
+    - TELEGRAM_BOT_TOKEN
 
 # Skill relationships
 conflicts: []              # Skills that cannot coexist without agent resolution
 depends: []                # Skills that must be applied first
 
 # Test command — runs after apply to validate the skill works
-test: "npx vitest run src/channels/whatsapp.test.ts"
+test: "npx vitest run src/channels/telegram.test.ts"
 
 # --- Future fields (not yet implemented in v0.1) ---
 # author: nanoclaw-team
@@ -432,9 +423,9 @@ Core updated: 0.5.0 → 0.8.0
   ✓ All patches applied
 
   Preserving your current setup:
-    + apple-containers@1.0.0
-    + add-whatsapp@2.0.0
-    + legacy-auth@1.0.0
+    + kubernetes-runtime@1.0.0
+    + add-telegram@2.0.0
+    + custom-auth@1.0.0
 
   Skill updates:
     ✓ add-telegram 1.0.0 → 1.2.0

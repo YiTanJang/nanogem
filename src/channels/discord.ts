@@ -1,7 +1,6 @@
 import { Client, GatewayIntentBits, Partials, TextChannel } from 'discord.js';
 import {
   ASSISTANT_NAME,
-  ASSISTANT_HAS_OWN_NUMBER, // This is WhatsApp specific, but keeping for now as a placeholder for potential future shared-bot logic
 } from '../config.js';
 import { logger } from '../logger.js';
 import { Channel, OnChatMetadata, OnInboundMessage, NewMessage, RegisteredGroup } from '../types.js';
@@ -57,11 +56,22 @@ export class DiscordChannel implements Channel {
           return;
         }
 
+        const isMentioned = message.mentions.has(this.client.user!.id);
+        const isDM = message.channel.type === 1; // DMChannel type is 1
+        const isBotMessage = isMentioned || isDM;
+
         logger.debug({ 
           author: message.author.username, 
           content: message.content, 
-          channel: message.channelId 
+          channel: message.channelId,
+          isBotMessage,
+          isMentioned,
+          isDM
         }, 'Raw Discord message received');
+
+        if (isBotMessage) {
+          logger.info({ author: message.author.username, isMentioned, isDM }, 'Discord bot message received (mention/DM)');
+        }
 
         const chatJid = `discord-${message.channel.id}`;
         const timestamp = message.createdAt.toISOString();
@@ -69,13 +79,6 @@ export class DiscordChannel implements Channel {
         const senderName = message.author.username;
         const content = message.content;
         const isFromMe = false;
-
-        // Trigger logic for Discord: 
-        // 1. Direct mentions of the bot identity
-        // 2. All Direct Messages
-        const isMentioned = message.mentions.has(this.client.user!.id);
-        const isDM = message.channel.type === 1; // DMChannel type is 1
-        const isBotMessage = isMentioned || isDM;
 
         // Notify about chat metadata for group discovery
         const isGroup = message.channel.type === 0; // TextChannel type is 0
@@ -222,6 +225,41 @@ export class DiscordChannel implements Channel {
       }
     } catch (err) {
       logger.debug({ jid, err }, 'Failed to update Discord typing status');
+    }
+  }
+
+  async createThread(parentJid: string, name: string): Promise<{ jid: string; url: string }> {
+    const parentId = parentJid.replace('discord-', '');
+    const parentChannel = await this.client.channels.fetch(parentId);
+
+    if (!parentChannel || !parentChannel.isTextBased() || !('threads' in parentChannel)) {
+      throw new Error(`Cannot create thread in JID: ${parentJid}. Channel not found or does not support threads.`);
+    }
+
+    const thread = await (parentChannel as any).threads.create({
+      name,
+      autoArchiveDuration: 1440, // 24 hours
+      reason: 'NanoClaw autonomous thread creation',
+    });
+
+    return {
+      jid: `discord-${thread.id}`,
+      url: thread.url,
+    };
+  }
+
+  async deleteThread(jid: string): Promise<void> {
+    try {
+      const threadId = jid.replace('discord-', '');
+      const channel = await this.client.channels.fetch(threadId);
+      if (channel && channel.isThread()) {
+        await channel.delete('NanoClaw autonomous thread deletion');
+        logger.info({ jid }, 'Discord thread physically deleted');
+      } else {
+        logger.warn({ jid }, 'Discord channel is not a thread, cannot delete');
+      }
+    } catch (err) {
+      logger.error({ jid, err }, 'Failed to physically delete Discord thread');
     }
   }
 

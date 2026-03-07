@@ -2,7 +2,7 @@
 
 ## What Skills Are For
 
-NanoClaw's core is intentionally minimal. Skills are how users extend it: adding channels, integrations, cross-platform support, or replacing internals entirely. Examples: add Telegram alongside WhatsApp, switch from Apple Container to Docker, add Gmail integration, add voice message transcription. Each skill modifies the actual codebase, adding channel handlers, updating the message router, changing container configuration, and adding dependencies, rather than working through a plugin API or runtime hooks.
+NanoClaw's core is intentionally minimal. Skills are how users extend it: adding channels, integrations, cross-platform support, or replacing internals entirely. Examples: add Telegram alongside Discord, switch from Docker to Kubernetes, add Gmail integration, add voice message transcription. Each skill modifies the actual codebase, adding channel handlers, updating the message router, changing container configuration, and adding dependencies, rather than working through a plugin API or runtime hooks.
 
 ## Why This Architecture
 
@@ -38,16 +38,16 @@ Before any operation, all affected files are copied to `.nanoclaw/backup/`. On s
 Source code where skills weave in logic. Merged via `git merge-file` against the shared base. Skills carry full modified files.
 
 ### Structured Data (Deterministic Operations)
-Files like `package.json`, `docker-compose.yml`, `.env.example`. Skills declare requirements in the manifest; the system applies them programmatically. Multiple skills' declarations are batched — dependencies merged, `package.json` written once, `npm install` run once.
+Files like `package.json`, `deployment.yaml`, `.env.template`. Skills declare requirements in the manifest; the system applies them programmatically. Multiple skills' declarations are batched — dependencies merged, `package.json` written once, `npm install` run once.
 
 ```yaml
 structured:
   npm_dependencies:
-    whatsapp-web.js: "^2.1.0"
+    discord.js: "^14.14.0"
   env_additions:
-    - WHATSAPP_TOKEN
+    - DISCORD_BOT_TOKEN
   docker_compose_services:
-    whatsapp-redis:
+    redis:
       image: redis:alpine
       ports: ["6380:6379"]
 ```
@@ -59,13 +59,13 @@ Structured conflicts (version incompatibilities, port collisions) follow the sam
 A skill contains only the files it adds or modifies. Modified code files carry the **full file** (clean core + skill's changes), making `git merge-file` straightforward and auditable.
 
 ```
-skills/add-whatsapp/
+skills/add-telegram/
   SKILL.md                    # What this skill does and why
   manifest.yaml               # Metadata, dependencies, structured ops
-  tests/whatsapp.test.ts      # Integration tests
-  add/src/channels/whatsapp.ts          # New files
-  modify/src/server.ts                  # Full modified file for merge
-  modify/src/server.ts.intent.md        # Structured intent for conflict resolution
+  tests/telegram.test.ts      # Integration tests
+  add/src/channels/telegram.ts          # New files
+  modify/src/index.ts                   # Full modified file for merge
+  modify/src/index.ts.intent.md         # Structured intent for conflict resolution
 ```
 
 ### Intent Files

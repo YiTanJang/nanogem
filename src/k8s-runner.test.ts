@@ -111,7 +111,7 @@ describe('Kubernetes Runner', () => {
   const testInput = {
     prompt: 'hello k8s',
     groupFolder: 'k8s-group',
-    chatJid: '123@g.us',
+    chatJid: '123',
     isMain: false,
   };
 

@@ -123,7 +123,7 @@ export function getAvailableGroups(): import('./container-runner.js').AvailableG
 }
 
 /**
- * Route a message to an external channel (Discord/WhatsApp).
+ * Route a message to an external channel (e.g. Discord).
  * This is for talking to HUMANS.
  */
 async function sendToUser(jid: string, rawText: string, media?: any): Promise<void> {
@@ -198,18 +198,17 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   const isMainGroup = group.folder === MAIN_GROUP_FOLDER;
   const isInternal = chatJid.startsWith('internal-');
   const needsTrigger = group.requiresTrigger ?? (!isMainGroup && !isInternal);
+if (needsTrigger) {
+  const hasBotFlag = missedMessages.some((m) => m.is_bot_message);
+  const isInternalTarget = chatJid.startsWith('internal-');
+  const isDiscord = chatJid.startsWith('discord-');
+  const hasTriggerPattern = (isInternalTarget || isDiscord) && missedMessages.some((m) => TRIGGER_PATTERN.test(m.content));
 
-  if (needsTrigger) {
-    const hasBotFlag = missedMessages.some((m) => m.is_bot_message);
-    const isWhatsApp = chatJid.endsWith('@g.us') || chatJid.endsWith('@s.whatsapp.net');
-    const isInternalTarget = chatJid.startsWith('internal-');
-    const hasTriggerPattern = (isWhatsApp || isInternalTarget) && missedMessages.some((m) => TRIGGER_PATTERN.test(m.content));
-    
-    if (!hasBotFlag && !hasTriggerPattern) {
-      updateLastAgentTimestamp(chatJid, missedMessages[missedMessages.length - 1].timestamp);
-      return true;
-    }
+  if (!hasBotFlag && !hasTriggerPattern) {
+    updateLastAgentTimestamp(chatJid, missedMessages[missedMessages.length - 1].timestamp);
+    return true;
   }
+}
 
   const prompt = formatMessages(missedMessages);
   logger.info({ group: group.name, messageCount: missedMessages.length }, 'Processing messages');
@@ -347,8 +346,9 @@ async function main(): Promise<void> {
     registeredGroups: () => registeredGroups,
   };
 
+  let discord: DiscordChannel | undefined;
   if (DISCORD_BOT_TOKEN) {
-    const discord = new DiscordChannel({ ...channelOpts, token: DISCORD_BOT_TOKEN });
+    discord = new DiscordChannel({ ...channelOpts, token: DISCORD_BOT_TOKEN });
     channels.push(discord);
     discord.connect().catch(err => logger.error({ err }, 'Failed to connect to Discord'));
   }
@@ -383,6 +383,8 @@ async function main(): Promise<void> {
     getAvailableGroups,
     writeGroupsSnapshot: (gf, im, ag, rj) => writeGroupsSnapshot(gf, im, ag, rj),
     runBuildJob: k8sRuntime.runBuildJob,
+    createDiscordThread: discord ? (parentJid, name) => discord!.createThread(parentJid, name) : undefined,
+    deleteDiscordThread: discord ? (jid) => discord!.deleteThread(jid) : undefined,
   });
 
   queue.setProcessMessagesFn(processGroupMessages);

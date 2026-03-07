@@ -4,22 +4,22 @@
 
 ```bash
 # 1. Is the service running?
+# Linux (systemd)
+systemctl --user status nanoclaw
+# macOS (launchd)
 launchctl list | grep nanoclaw
-# Expected: PID  0  com.nanoclaw (PID = running, "-" = not running, non-zero exit = crashed)
 
-# 2. Any running containers?
+# 2. Any running containers or pods?
 docker ps --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
+kubectl get pods -n nanoclaw
 
-# 3. Any stopped/orphaned containers?
-docker ps -a --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
-
-# 4. Recent errors in service log?
+# 3. Recent errors in service log?
 grep -E 'ERROR|WARN' logs/nanoclaw.log | tail -20
 
-# 5. Is WhatsApp connected? (look for last connection event)
-grep -E 'Connected to WhatsApp|Connection closed|connection.*close' logs/nanoclaw.log | tail -5
+# 4. Is Discord connected?
+grep -E 'Connected to Discord|Discord connection' logs/nanoclaw.log | tail -5
 
-# 6. Are groups loaded?
+# 5. Are groups loaded?
 grep 'groupCount' logs/nanoclaw.log | tail -3
 ```
 
@@ -33,11 +33,11 @@ ls -la data/sessions/<group>/.gemini/
 ls -la groups/<group>/.nanoclaw/history.json
 ```
 
-## Container Timeout Investigation
+## Container/Pod Timeout Investigation
 
 ```bash
 # Check for recent timeouts
-grep -E 'Container timeout|timed out' logs/nanoclaw.log | tail -10
+grep -E 'Container timeout|timed out|Pod reached max life' logs/nanoclaw.log | tail -10
 
 # Check container log files for the timed-out container
 ls -lt groups/*/logs/container-*.log | head -10
@@ -52,14 +52,17 @@ grep -E 'Scheduling retry|retry|Max retries' logs/nanoclaw.log | tail -10
 ## Agent Not Responding
 
 ```bash
-# Check if messages are being received from WhatsApp
-grep 'New messages' logs/nanoclaw.log | tail -10
+# Check if messages are being received from Discord
+grep 'Raw Discord message received' logs/nanoclaw.log | tail -10
+
+# Check if a bot message (mention/DM) was recognized
+grep 'Discord bot message received' logs/nanoclaw.log | tail -10
 
 # Check if messages are being processed (container spawned)
-grep -E 'Processing messages|Spawning container' logs/nanoclaw.log | tail -10
+grep -E 'Processing messages|Creating agent pod' logs/nanoclaw.log | tail -10
 
 # Check if messages are being piped to active container
-grep -E 'Piped messages|sendMessage' logs/nanoclaw.log | tail -10
+grep -E 'Piped message|sendMessage' logs/nanoclaw.log | tail -10
 
 # Check the queue state — any active containers?
 grep -E 'Starting container|Container active|concurrency limit' logs/nanoclaw.log | tail -10
@@ -68,7 +71,7 @@ grep -E 'Starting container|Container active|concurrency limit' logs/nanoclaw.lo
 sqlite3 store/messages.db "SELECT chat_jid, MAX(timestamp) as latest FROM messages GROUP BY chat_jid ORDER BY latest DESC LIMIT 5;"
 ```
 
-## Container Mount Issues
+## Container/Pod Mount Issues
 
 ```bash
 # Check mount validation logs (shows on container spawn)
@@ -81,38 +84,33 @@ cat ~/.config/nanoclaw/mount-allowlist.json
 sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;"
 
 # Test-run a container to check mounts (dry run)
-# Replace <group-folder> with the group's folder name
 docker run -i --rm --entrypoint ls nanoclaw-agent:latest /workspace/extra/
 ```
 
-## WhatsApp Auth Issues
+## Discord Auth Issues
 
 ```bash
-# Check if QR code was requested (means auth expired)
-grep 'QR\|authentication required\|qr' logs/nanoclaw.log | tail -5
+# Check if token is configured
+grep 'DISCORD_BOT_TOKEN' .env
 
-# Check auth files exist
-ls -la store/auth/
-
-# Re-authenticate if needed
-npm run auth
+# Check for connection errors
+grep -i 'failed to connect to discord' logs/nanoclaw.log | tail -5
 ```
 
 ## Service Management
 
 ```bash
-# Restart the service
+# Linux (systemd)
+systemctl --user restart nanoclaw
+systemctl --user stop nanoclaw
+systemctl --user start nanoclaw
+
+# macOS (launchd)
 launchctl kickstart -k gui/$(id -u)/com.nanoclaw
 
 # View live logs
 tail -f logs/nanoclaw.log
 
-# Stop the service (careful — running containers are detached, not killed)
-launchctl bootout gui/$(id -u)/com.nanoclaw
-
-# Start the service
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nanoclaw.plist
-
-# Rebuild after code changes
-npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+# Rebuild and restart after code changes
+npm run build && systemctl --user restart nanoclaw
 ```
