@@ -65,71 +65,46 @@ The project uses Docker by default (cross-platform). For macOS users who prefer 
 
 ## Vision
 
-A personal Gemini assistant accessible via Discord, with minimal custom code.
+A personal Gemini assistant swarm accessible via Discord, featuring hierarchical orchestration and SOTA cognitive memory.
 
 **Core components:**
-- **Gemini API** as the core agent
-- **Containers** for isolated agent execution (Linux VMs)
+- **Gemini API** as the core agent (via Unified SDK)
+- **Kubernetes Pods** for hard-isolated agent execution (Linux VMs)
 - **Discord** as the primary I/O channel
-- **Persistent memory** per conversation and globally
+- **Cognitive Memory** (Continuum + Episodic) for long-term coherence
+- **Mission Protocol** for structured delegation between agents
 - **Scheduled tasks** that run Gemini and can message back
-- **Web access** for search and browsing
-- **Browser automation** via agent-browser
-
-**Implementation approach:**
-- Use existing tools (Discord connector, Gemini API, MCP servers)
-- Minimal glue code
-- File-based systems where possible (GEMINI.md for memory, folders for groups)
+- **Kaniko** for cluster-native self-evolution
 
 ---
 
 ## Architecture Decisions
 
 ### Message Routing
-- A router listens to Discord and routes messages based on configuration
-- Only messages from registered groups/channels are processed
-- Trigger: `@Andy` prefix (case insensitive), configurable via `ASSISTANT_NAME` env var
-- Unregistered groups are ignored completely
+- A router listens to Discord and routes messages to the GroupQueue.
+- Only messages from registered groups/channels are processed.
+- Trigger: `@NanoGem` prefix (case insensitive), configurable via `ASSISTANT_NAME`.
 
-### Memory System
-- **Per-group memory**: Each group has a folder with its own `GEMINI.md`
-- **Global memory**: Root `GEMINI.md` is read by all groups, but only writable from "main" (private channel)
-- **Files**: Groups can create/read files in their folder and reference them
-- Agent runs in the group's folder, automatically inherits both GEMINI.md files
+### Cognitive Memory System (2026 SOTA)
+- **Decoupled Knowledge**: Each agent maintains a `continuum/` of mutable facts and workflows.
+- **Episodic Recall**: Past missions are automatically summarized into `episodes/`.
+- **Lazy Loading**: Only essential snippets are loaded into the prompt by default; full memory is retrieved via the `recall_memory` tool.
 
-### Session Management
-- Each group maintains a conversation session (via Gemini API)
-- Sessions auto-compact when context gets too long, preserving critical information
+### Hierarchical Orchestration (Swarm)
+- **Manager-Worker Protocol**: Agents use the `delegate_task` tool to assign formal missions.
+- **Reporting**: Workers use the `submit_work` tool to report results back to the assigner.
+- **Isolation**: Sub-agents run in their own ephemeral pods with private memory and workspace folders.
 
-### Container Isolation
-- All agents run inside containers (lightweight Linux VMs)
-- Each agent invocation spawns a container with mounted directories
-- Containers provide filesystem isolation - agents can only see mounted paths
-- Bash access is safe because commands run inside the container, not on the host
-- Browser automation via agent-browser with Chromium in the container
-
-### Scheduled Tasks
-- Users can ask Gemini to schedule recurring or one-time tasks from any group
-- Tasks run as full agents in the context of the group that created them
-- Tasks have access to all tools including Bash (safe in container)
-- Tasks can optionally send messages to their group via `send_message` tool, or complete silently
-- Task runs are logged to the database with duration and result
-- Schedule types: cron expressions, intervals (ms), or one-time (ISO timestamp)
-- From main: can schedule tasks for any group, view/manage all tasks
-- From other groups: can only manage that group's tasks
-
-### Group Management
-- New groups are added explicitly via the main channel
-- Groups are registered in SQLite (via the main channel or IPC `register_group` command)
-- Each group gets a dedicated folder under `groups/`
-- Groups can have additional directories mounted via `containerConfig`
+### Pod Isolation & Lifecycle
+- Every agent invocation spawns a native Kubernetes Pod.
+- **Filesystem-based Exit**: The orchestrator uses `fs.watch` on the IPC folder to detect an agent's `exit` sentinel instantly, resetting the queue without waiting for slow K8s API updates.
+- **Max Pod Life**: 30-minute hard limit to prevent infinite loops.
 
 ### Main Channel Privileges
-- Main channel is the admin/control group (typically your private Discord channel)
-- Can write to global memory (`groups/GEMINI.md`)
-- Can schedule tasks for any group
-- Can view and manage tasks from all groups
-- Can configure additional directory mounts for any group
+- The Main channel acts as the Head Manager.
+- Can write to global memory and project source code.
+- Can rollout system updates via `rebuild_self`.
+- Can manage all registered groups and global task schedules.
 
 ---
 

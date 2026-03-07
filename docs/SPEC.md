@@ -117,8 +117,13 @@ nanogem/
 │   ├── Dockerfile                 # Image definition for agents
 │   ├── agent-runner/              # Code that runs inside the pod
 │   │   ├── src/
-│   │   │   ├── index.ts           # Agent entry point
-│   │   │   └── ipc-mcp-stdio.ts   # Pod-to-host communication
+│   │   │   ├── index.ts           # Agent entry point (Slim Orchestrator)
+│   │   │   └── modules/           # Modular logic components
+│   │   │       ├── gemini.ts      # Core LLM interaction
+│   │   │       ├── memory.ts      # Cognitive memory management
+│   │   │       ├── tools.ts       # Tool definitions & functions
+│   │   │       ├── mcp.ts         # Model Context Protocol manager
+│   │   │       └── types.ts       # Shared module types
 │   └── skills/
 │       └── agent-browser.md       # Browser automation skill
 │
@@ -144,15 +149,37 @@ export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || 'NanoGem';
 export const POLL_INTERVAL = 2000;
 export const SCHEDULER_POLL_INTERVAL = 60000;
 
+// Memory System (2026 SOTA)
+export const MEMORY_DIR_NAME = '.nanogem/memory';
+export const CONTINUUM_DIR_NAME = 'continuum';
+export const EPISODES_DIR_NAME = 'episodes';
+
 // Container/Pod configuration
 export const CONTAINER_IMAGE = process.env.CONTAINER_IMAGE || 'nanogem-agent:latest';
 export const CONTAINER_TIMEOUT = parseInt(process.env.CONTAINER_TIMEOUT || '1800000', 10);
 export const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 // Kubernetes specifics
-export const K8S_NAMESPACE = process.env.K8S_NAMESPACE || 'default';
-export const K8S_PVC_NAME = process.env.K8S_PVC_NAME || 'nanogem-pvc';
+export const K8S_NAMESPACE = process.env.K8S_NAMESPACE || 'nanogem';
+export const K8S_PVC_NAME = process.env.K8S_PVC_NAME || 'nanogem-pvc-final';
 ```
+
+---
+
+## Memory System (2026 SOTA)
+
+NanoGem implements a tiered cognitive memory architecture to maintain focus and long-term coherence.
+
+| Tier | File Path | Type | Managed By | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| **Identity** | `GEMINI.md` | Fixed | User | Core persona and permanent rules. |
+| **Continuum** | `continuum/facts.md` | Mutable | Agent | Current distilled facts and truths. |
+| **Continuum** | `continuum/workflows.md` | Mutable | Agent | Verified procedural steps for complex tasks. |
+| **Episodic** | `episodes/*.md` | Archive | System | Summaries of every completed mission. |
+| **Working** | `history.json` | Volatile | LLM | Verbatim recent message history. |
+
+### Tool-Based Retrieval
+The agent uses the `recall_memory(category)` tool to lazily load full fact-sheets or historical episodes into its context, keeping the initial prompt small and fast.
 
 ---
 
@@ -176,22 +203,22 @@ export const K8S_PVC_NAME = process.env.K8S_PVC_NAME || 'nanogem-pvc';
 5. Router checks registration and trigger
    │
    ▼
-6. Router builds prompt with full conversation context
+6. Router builds prompt with Identity + Memory Snippets
    │
    ▼
 7. Router invokes Gemini Agent:
    ├── Spawns Kubernetes pod
    ├── cwd: groups/{group-name}/ (via PVC subpath)
-   └── resume: session history
+   └── Watchers: K8s API + fs.watch(IPC)
    │
    ▼
-8. Gemini processes message using tools
+8. Gemini processes message using modular tools
    │
    ▼
-9. Router sends response back to Discord channel
+9. Agent writes exit-{ts}.json sentinel to IPC
    │
    ▼
-10. Update last agent timestamp and save session
+10. Orchestrator detects sentinel instantly, resets queue
 ```
 
 ---

@@ -11,22 +11,20 @@
 
 ## Security Boundaries
 
-### 1. Container/Pod Isolation (Primary Boundary)
+### 1. Pod Isolation (Primary Boundary)
 
-Agents execute in isolated containers or Kubernetes pods, providing:
-- **Process isolation** - Container processes cannot affect the host.
-- **Filesystem isolation** - Only explicitly mounted directories are visible.
-- **Non-root execution** - Runs as unprivileged `node` user (uid 1000).
-- **Ephemeral environment** - Fresh environment per invocation.
-
-This is the primary security boundary. Rather than relying on application-level permission checks, the attack surface is limited by what's mounted.
+Agents execute in isolated Kubernetes Pods, providing:
+- **Process isolation** - Container namespaces prevent agents from seeing the host or other pods.
+- **Filesystem isolation** - Only explicitly mounted sub-paths from the shared PVC are visible.
+- **Non-root execution** - All processes run as the unprivileged `node` user (UID 1000).
+- **Ephemeral environments** - Pods are deleted after their mission, ensuring no local state persistence beyond the mounted volumes.
 
 ### 2. Mount Security
 
-**External Allowlist** - Mount permissions stored at `~/.config/nanogem/mount-allowlist.json`, which is:
-- Outside project root
-- Never mounted into containers
-- Cannot be modified by agents
+**External Allowlist** - Mount permissions are validated against a local allowlist at `~/.config/nanogem/mount-allowlist.json`.
+- **Atomic Resolution**: Symlinks are resolved before validation to prevent traversal attacks.
+- **Path Stripping**: Agents cannot use `..` or absolute paths to reach outside their assigned mounts.
+- **Selective Write**: The project source code is mounted READ-ONLY for all agents, except the Head Manager which has selective WRITE access for self-evolution.
 
 **Default Blocked Patterns:**
 ```
@@ -44,25 +42,25 @@ private_key, .secret
 
 The main group's project root is mounted read-only. Writable paths the agent needs (group folder, IPC, `.gemini/`) are mounted separately. This prevents the agent from modifying host application code (`src/`, `dist/`, `package.json`, etc.) which would bypass the sandbox entirely on next restart.
 
-### 3. Session Isolation
+### 3. Session & Memory Isolation
 
-Each group has isolated Gemini sessions at `data/sessions/{group}/.gemini/`:
-- Groups cannot see other groups' conversation history.
-- Session data includes full message history and file contents read.
-- Prevents cross-group information disclosure.
+Each agent has an isolated memory directory at `/workspace/group/.nanogem/memory/`.
+- **Continuum Isolation**: Agents cannot modify the `facts.md` or `workflows.md` of other agents.
+- **Episodic Privacy**: Episode summaries are private to the agent's folder unless explicitly reported via `submit_work`.
 
 ### 4. IPC Authorization
 
 Messages and task operations are verified against group identity:
 
-| Operation | Main Group | Non-Main Group |
-|-----------|------------|----------------|
-| Send message to own chat | ✓ | ✓ |
-| Send message to other chats | ✓ | ✗ |
-| Schedule task for self | ✓ | ✓ |
-| Schedule task for others | ✓ | ✗ |
-| View all tasks | ✓ | Own only |
-| Manage other groups | ✓ | ✗ |
+| Operation | Head Manager (Main) | Specialist Agent |
+|-----------|---------------------|------------------|
+| Create Discord Thread | ✓ | ✗ |
+| Register New Group | ✓ | ✗ |
+| System Rebuild/Evolution | ✓ | ✗ |
+| Delegate Structured Task | ✓ | ✓ |
+| Submit Work (Report) | ✓ | ✓ |
+| View All Tasks | ✓ | Own only |
+| Update Global Memory | ✓ | ✗ |
 
 ### 5. Credential Handling
 
@@ -82,14 +80,14 @@ const allowedVars = ['GEMINI_API_KEY'];
 
 ## Privilege Comparison
 
-| Capability | Main Group | Non-Main Group |
+| Capability | Head Manager (Main) | Specialist Agent |
 |------------|------------|----------------|
-| Project root access | `/workspace/project` (ro) | None |
-| Group folder | `/workspace/group` (rw) | `/workspace/group` (rw) |
-| Global memory | Implicit via project | `/workspace/global` (ro) |
-| Additional mounts | Configurable | Read-only unless allowed |
-| Network access | Unrestricted | Unrestricted |
-| MCP tools | All | All |
+| Project source access | READ-WRITE (selective) | READ-ONLY |
+| System Evolution | Authorized (rebuild_self) | Unauthorized |
+| Swarm Management | Authorized (register/delete) | Unauthorized |
+| Global Memory | READ-WRITE | READ-ONLY |
+| Private Memory | READ-WRITE | READ-WRITE |
+| Web/Tool Access | Full | Full |
 
 ## Security Architecture Diagram
 
@@ -102,20 +100,20 @@ const allowedVars = ['GEMINI_API_KEY'];
                                  ▼ Trigger check, input escaping
 ┌──────────────────────────────────────────────────────────────────┐
 │                     HOST PROCESS (TRUSTED)                        │
-│  • Message routing                                                │
-│  • IPC authorization                                              │
+│  • Message routing & GroupQueue                                   │
+│  • IPC authorization & Mission validation                         │
 │  • Mount validation (external allowlist)                          │
-│  • Container/Pod lifecycle                                        │
+│  • Kubernetes Pod lifecycle & Watch API                           │
 │  • Credential filtering                                           │
 └────────────────────────────────┬─────────────────────────────────┘
                                  │
                                  ▼ Explicit mounts only
 ┌──────────────────────────────────────────────────────────────────┐
-│                CONTAINER (ISOLATED/SANDBOXED)                     │
-│  • Agent execution                                                │
-│  • Bash commands (sandboxed)                                      │
-│  • File operations (limited to mounts)                            │
+│                AGENT POD (ISOLATED/SANDBOXED)                     │
+│  • Modular Agent Runner execution                                 │
+│  • Bash commands (sandboxed in Linux namespace)                   │
+│  • File operations (limited to PVC sub-paths)                     │
+│  • Tiered Cognitive Memory (Continuum/Episodes)                  │
 │  • Network access (unrestricted)                                  │
-│  • Cannot modify security config                                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
