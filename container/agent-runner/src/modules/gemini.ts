@@ -8,19 +8,49 @@ export class GeminiManager {
   private client: any;
   private modelName: string;
   private chat: any;
+  private cachedContentName: string | undefined;
 
   constructor(apiKey: string, modelName: string) {
     this.client = new (GoogleGenAI as any)({ apiKey });
     this.modelName = modelName;
   }
 
-  async initChat(systemInstruction: string, history: any[], allTools: any[]) {
-    this.chat = (this.client.chats as any).create({
+  /**
+   * Creates an explicit context cache for static, high-volume content.
+   * Requires at least 32,768 tokens.
+   */
+  async createCache(displayName: string, systemInstruction: string, largeText: string): Promise<string> {
+    const cache = await (this.client as any).caches.create({
       model: this.modelName,
       config: {
+        displayName,
         systemInstruction,
-        tools: [{ functionDeclarations: allTools }]
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: largeText }]
+          }
+        ],
+        ttlSeconds: 3600, // 1 hour default
       },
+    });
+    this.cachedContentName = cache.name;
+    return cache.name;
+  }
+
+  async initChat(systemInstruction: string, history: any[], allTools: any[]) {
+    const config: any = {
+      systemInstruction,
+      tools: [{ functionDeclarations: allTools }]
+    };
+
+    if (this.cachedContentName) {
+      config.cachedContent = this.cachedContentName;
+    }
+
+    this.chat = (this.client.chats as any).create({
+      model: this.modelName,
+      config,
       history
     });
   }

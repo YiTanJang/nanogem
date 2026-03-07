@@ -13,7 +13,7 @@ import {
   IPC_DIR
 } from './modules/types.js';
 import { loadCognitiveMemory, recordEpisode } from './modules/memory.js';
-import { getFunctions, toolDeclarations } from './modules/tools.js';
+import { getFunctions, getToolDeclarations } from './modules/tools.js';
 import { McpManager } from './modules/mcp.js';
 import { GeminiManager } from './modules/gemini.js';
 
@@ -82,9 +82,10 @@ async function main(): Promise<void> {
   }
 
   // Inject Lazy Cognitive Memory
-  systemPrompt += loadCognitiveMemory();
+  const cognitiveMemory = loadCognitiveMemory();
+  systemPrompt += cognitiveMemory;
 
-  // Inject High-Priority Mission
+  // MISSION INJECTION
   if (fs.existsSync(missionPath)) {
     try {
       const mission = JSON.parse(fs.readFileSync(missionPath, 'utf-8'));
@@ -92,7 +93,24 @@ async function main(): Promise<void> {
     } catch (e) {}
   }
 
-  // 4. Load History
+  // 4. CONTEXT CACHING (YOLO Implementation)
+  // If the total context is large (approx > 32k tokens), we cache it.
+  // We use a rough heuristic: 1 token ~= 4 characters.
+  const ESTIMATED_TOKENS = (systemPrompt.length + cognitiveMemory.length) / 4;
+  if (ESTIMATED_TOKENS > 32768) {
+    try {
+      console.error(`[agent-runner] Context is large (~${Math.round(ESTIMATED_TOKENS)} tokens). Creating remote cache...`);
+      await geminiManager.createCache(
+        `nanogem-${input.groupFolder}-${Date.now()}`,
+        systemPrompt,
+        "Memory and system context cached for performance."
+      );
+    } catch (err) {
+      console.error(`[agent-runner] Cache creation failed (falling back to standard prompt): ${err}`);
+    }
+  }
+
+  // 5. Load History
   const historyPath = path.join('/workspace/group', '.nanogem', 'history.json');
   let history: any[] = [];
   if (fs.existsSync(historyPath)) {
@@ -103,7 +121,7 @@ async function main(): Promise<void> {
   }
 
   // 5. Start Chat Session
-  const allTools = [...toolDeclarations, ...mcpManager.getToolDeclarations()];
+  const allTools = [...getToolDeclarations(), ...mcpManager.getToolDeclarations()];
   const functions = getFunctions(input, geminiManager as any, modelName);
 
   await geminiManager.initChat(systemPrompt, history, allTools);
