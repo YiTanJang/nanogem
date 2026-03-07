@@ -1,8 +1,7 @@
 /**
  * NanoClaw Agent Runner (Gemini 2026 Edition)
- * Runs inside a container, receives config via stdin, outputs result to stdout.
+ * Runs inside a Kubernetes pod, receives config via stdin, outputs result to stdout.
  * Uses the modern @google/genai unified SDK.
- * Implements "Nested Native Search" to bypass v1beta tool combination restrictions.
  */
 
 import fs from 'fs';
@@ -41,13 +40,6 @@ interface ContainerOutput {
   error?: string;
 }
 
-interface AvailableGroup {
-  jid: string;
-  name: string;
-  lastActivity: string;
-  isRegistered: boolean;
-}
-
 const OUTPUT_START_MARKER = '---NANOCLAW_OUTPUT_START---';
 const OUTPUT_END_MARKER = '---NANOCLAW_OUTPUT_END---';
 const IPC_DIR = '/workspace/ipc';
@@ -63,7 +55,6 @@ function writeOutput(output: ContainerOutput): void {
   console.log(json);
   console.log(OUTPUT_END_MARKER);
 
-  // Persistence backup: Append the result to THOUGHTS.log for orchestrator to track reliably
   if (output.result && output.status === 'success') {
     try {
       const thoughtPath = path.join('/workspace/group', 'THOUGHTS.log');
@@ -73,7 +64,6 @@ function writeOutput(output: ContainerOutput): void {
     }
   }
 
-  // Failsafe: Write to persistent IPC directory in case log streaming fails
   try {
     const resultFile = `result-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.json`;
     const resultPath = path.join(IPC_DIR, resultFile);
@@ -99,7 +89,7 @@ function writeIpcFile(dir: string, data: object): void {
 const toolDeclarations = [
   {
     name: 'bash',
-    description: 'Execute a bash command in the isolated container environment.',
+    description: 'Execute a bash command in the isolated pod environment.',
     parameters: {
       type: 'OBJECT' as const,
       properties: {
@@ -193,7 +183,7 @@ const toolDeclarations = [
   },
   {
     name: 'web_search',
-    description: 'Search the live web for current information using Google Search. Use this whenever you need up-to-date information, news, or to verify facts.',
+    description: 'Search the live web for current information using Google Search.',
     parameters: {
       type: 'OBJECT' as const,
       properties: {
@@ -260,7 +250,7 @@ const toolDeclarations = [
         },
         targetJid: {
           type: 'STRING' as const,
-          description: 'Optional target JID (for delegating to other agents)',
+          description: 'Optional target JID',
         },
       },
       required: ['prompt', 'schedule_type', 'schedule_value'],
@@ -268,7 +258,7 @@ const toolDeclarations = [
   },
   {
     name: 'create_discord_thread',
-    description: 'Create a new Discord thread and bind an autonomous sub-agent to it. Returns the URL of the new thread. Use this to create dedicated workspaces for specialized tasks or human collaboration.',
+    description: 'Create a new Discord thread and bind an autonomous sub-agent to it.',
     parameters: {
       type: 'OBJECT' as const,
       properties: {
@@ -278,7 +268,7 @@ const toolDeclarations = [
         },
         parentJid: {
           type: 'STRING' as const,
-          description: 'The JID of the parent Discord channel (e.g. discord-123456789). Use the chatJid of the current context if you want to create a thread here.',
+          description: 'The JID of the parent Discord channel (e.g. discord-123456789).',
         },
         folder: {
           type: 'STRING' as const,
@@ -286,11 +276,11 @@ const toolDeclarations = [
         },
         systemInstruction: {
           type: 'STRING' as const,
-          description: 'The system instructions (brain) for the new sub-agent. Must include Safety Protocol if it codes.',
+          description: 'The system instructions (brain) for the new sub-agent.',
         },
         ephemeral: {
           type: 'BOOLEAN' as const,
-          description: 'If true, the sub-agent and its files will be deleted when delete_group is called. Default is true.',
+          description: 'If true, the sub-agent and its files will be deleted when delete_group is called.',
         }
       },
       required: ['name', 'parentJid', 'folder', 'systemInstruction'],
@@ -298,35 +288,35 @@ const toolDeclarations = [
   },
   {
     name: 'rebuild_self',
-    description: 'Trigger a Kaniko build job to recompile NanoClaw and restart the orchestrator. This uses the fixed system Dockerfile for security.',
+    description: 'Trigger a build job to recompile NanoClaw and restart the orchestrator.',
     parameters: {
       type: 'OBJECT' as const,
       properties: {
         imageTag: { type: 'STRING' as const, description: 'Optional custom image tag' },
         resumptionPrompt: { 
           type: 'STRING' as const, 
-          description: 'The command or task description to be delivered to you after the system restarts. Use this to ensure you continue your mission (e.g. \"Implement the Discord bridge logic\").' 
+          description: 'Command to execute after restart.' 
         },
       },
     },
   },
   {
     name: 'build_project',
-    description: 'Build a Docker image for a specific project folder and push it to the local registry. This does NOT restart the NanoClaw orchestrator.',
+    description: 'Build an image for a specific project folder and push it to the local registry.',
     parameters: {
       type: 'OBJECT' as const,
       properties: {
         imageTag: {
           type: 'STRING' as const,
-          description: 'The destination image tag (e.g. registry.local:5000/my-app:latest)',
+          description: 'The destination image tag',
         },
         folder: {
           type: 'STRING' as const,
-          description: 'The folder containing the project code (e.g. "my-web-app"). This folder must exist in the groups directory.',
+          description: 'The folder containing the project code.',
         },
         dockerfilePath: {
           type: 'STRING' as const,
-          description: 'Optional path to the Dockerfile (relative to the project folder, defaults to "Dockerfile")',
+          description: 'Optional path to the Dockerfile (relative to the project folder)',
         },
       },
       required: ['imageTag', 'folder'],
@@ -334,37 +324,37 @@ const toolDeclarations = [
   },
   {
     name: 'register_group',
-    description: 'Register a new specialized agent group workspace. Use this to spawn sub-agents with their own isolated memory and files.',
+    description: 'Register a new specialized agent group workspace.',
     parameters: {
       type: 'OBJECT' as const,
       properties: {
         jid: {
           type: 'STRING' as const,
-          description: 'Unique identifier for the group (optional, will be generated if omitted)',
+          description: 'Unique identifier for the group',
         },
         name: {
           type: 'STRING' as const,
-          description: 'Display name for the sub-agent (e.g. "Film Researcher")',
+          description: 'Display name for the sub-agent',
         },
         folder: {
           type: 'STRING' as const,
-          description: 'Unique folder name (lowercase, hyphens, e.g. "agent-film")',
+          description: 'Unique folder name',
         },
         trigger: {
           type: 'STRING' as const,
-          description: 'Trigger word for this group (e.g. "@Andy")',
+          description: 'Trigger word for this group',
         },
         requiresTrigger: {
           type: 'BOOLEAN' as const,
-          description: 'Whether the trigger prefix is required (default: true)',
+          description: 'Whether the trigger prefix is required',
         },
         containerConfig: {
           type: 'OBJECT' as const,
-          description: 'Optional configuration for the container environment',
+          description: 'Optional configuration for the pod environment',
         },
         systemInstruction: {
           type: 'STRING' as const,
-          description: 'The core identity and instructions for the agent (Markdown format). Use this to define its role and workflow (e.g. REPORT.md requirements).',
+          description: 'The core identity and instructions for the agent.',
         },
         ephemeral: {
           type: 'BOOLEAN' as const,
@@ -390,13 +380,13 @@ const toolDeclarations = [
   },
   {
     name: 'delete_discord_thread',
-    description: 'Deletes an autonomous sub-agent AND physically deletes its associated Discord thread. Use this to fully clean up a dynamic workspace created with create_discord_thread when the task is complete.',
+    description: 'Deletes an autonomous sub-agent and its associated Discord thread.',
     parameters: {
       type: 'OBJECT' as const,
       properties: {
         jid: {
           type: 'STRING' as const,
-          description: 'The unique identifier (JID) of the Discord thread and group to delete (e.g. discord-123456789)',
+          description: 'The unique identifier (JID) of the Discord thread.',
         },
       },
       required: ['jid'],
@@ -418,11 +408,11 @@ const toolDeclarations = [
       properties: {
         folder: {
           type: 'STRING' as const,
-          description: 'The folder name of the sub-agent (e.g. "agent-film")',
+          description: 'The folder name of the sub-agent',
         },
         timeoutMs: {
           type: 'NUMBER' as const,
-          description: 'Maximum time to wait in milliseconds (default 60000)',
+          description: 'Maximum wait time in ms',
         },
       },
       required: ['folder'],
@@ -430,13 +420,13 @@ const toolDeclarations = [
   },
   {
     name: 'append_thought',
-    description: 'Stream a partial thought or progress update to the group THOUGHTS.log. Use this to provide real-time feedback to a coordinator.',
+    description: 'Stream progress updates to the group THOUGHTS.log.',
     parameters: {
       type: 'OBJECT' as const,
       properties: {
         text: {
           type: 'STRING' as const,
-          description: 'The thought or update text to append',
+          description: 'The update text',
         },
       },
       required: ['text'],
@@ -444,17 +434,17 @@ const toolDeclarations = [
   },
   {
     name: 'follow_stream',
-    description: 'Follow the THOUGHTS.log stream of a sub-agent in real-time. Returns any new lines added to the log.',
+    description: 'Follow the THOUGHTS.log stream of a sub-agent in real-time.',
     parameters: {
       type: 'OBJECT' as const,
       properties: {
         folder: {
           type: 'STRING' as const,
-          description: 'The folder name of the sub-agent to follow',
+          description: 'The folder name of the sub-agent',
         },
         timeoutMs: {
           type: 'NUMBER' as const,
-          description: 'Maximum time to wait for new thoughts in ms (default 30000)',
+          description: 'Maximum time to wait for new thoughts',
         },
       },
       required: ['folder'],
@@ -478,7 +468,6 @@ const getFunctions = (
   read_file: ({ path: filePath }) => {
     try {
       const fullPath = path.isAbsolute(filePath) ? filePath : path.resolve('/workspace/group', filePath);
-      log(`Read request: ${filePath} -> ${fullPath}`);
       if (!fullPath.startsWith('/workspace/group') && !fullPath.startsWith('/workspace/project'))
         return 'Error: Access denied.';
       return fs.readFileSync(fullPath, 'utf-8');
@@ -489,7 +478,6 @@ const getFunctions = (
   write_file: ({ path: filePath, content }) => {
     try {
       const fullPath = path.isAbsolute(filePath) ? filePath : path.resolve('/workspace/group', filePath);
-      log(`Write request: ${filePath} -> ${fullPath}`);
       if (!fullPath.startsWith('/workspace/group') && !fullPath.startsWith('/workspace/project'))
         return 'Error: Access denied.';
       fs.mkdirSync(path.dirname(fullPath), { recursive: true });
@@ -502,7 +490,6 @@ const getFunctions = (
   edit_file: ({ path: filePath, oldText, newText }) => {
     try {
       const fullPath = path.isAbsolute(filePath) ? filePath : path.resolve('/workspace/group', filePath);
-      log(`Edit request: ${filePath} -> ${fullPath}`);
       if (!fullPath.startsWith('/workspace/group') && !fullPath.startsWith('/workspace/project'))
         return 'Error: Access denied.';
       const content = fs.readFileSync(fullPath, 'utf-8');
@@ -538,7 +525,6 @@ const getFunctions = (
   },
   web_search: async ({ query }) => {
     try {
-      log(`Triggering nested native search for: ${query} using ${modelName}`);
       const searchResponse = await client.models.generateContent({
         model: modelName,
         contents: [{
@@ -557,7 +543,6 @@ const getFunctions = (
       }
       return (text || 'No information found.') + metadata;
     } catch (err: any) {
-      log(`Nested search error: ${err.message}`);
       return `Error performing native search: ${err.message}`;
     }
   },
@@ -622,7 +607,7 @@ const getFunctions = (
       ephemeral: ephemeral ?? true,
       chatJid: input.chatJid,
     });
-    return `Requested creation of Discord thread '${name}' with sub-agent in folder '${folder}'. The orchestrator will send a follow-up message with the thread URL once it is created.`;
+    return `Requested creation of Discord thread '${name}' with sub-agent in folder '${folder}'.`;
   },
   rebuild_self: ({ imageTag, resumptionPrompt }) => {
     writeIpcFile(TASKS_DIR, {
@@ -631,28 +616,27 @@ const getFunctions = (
       resumptionPrompt,
       timestamp: new Date().toISOString(),
     });
-    return 'Rebuild requested. The system will rebuild and restart shortly using the official system Dockerfile.';
+    return 'Rebuild requested. The system will rebuild and restart shortly.';
   },
   build_project: ({ imageTag, folder, dockerfilePath }) => {
     writeIpcFile(TASKS_DIR, {
       type: 'build_project',
       imageTag,
       dockerfilePath,
-      contextPath: `groups/${folder}`, // Correct context path for projects
+      contextPath: `groups/${folder}`,
       shouldRollout: false,
       timestamp: new Date().toISOString(),
     });
-    return `Build requested for project in "${folder}". The image will be pushed to ${imageTag}.`;
+    return `Build requested for project in "${folder}".`;
   },
   register_group: ({ jid, name, folder, trigger, requiresTrigger, containerConfig, systemInstruction, ephemeral }) => {
     const finalJid = jid || `internal-${folder}-${Math.random().toString(36).slice(2, 8)}`;
     const finalRequiresTrigger = requiresTrigger ?? !finalJid.startsWith('internal-');
     
     if (!systemInstruction) {
-      return 'Error: You must provide a systemInstruction (identity) to initialize a new agent.';
+      return 'Error: systemInstruction required.';
     }
 
-    // Pass the request to the Orchestrator (the Gatekeeper) via IPC
     writeIpcFile(TASKS_DIR, {
       type: 'register_group',
       jid: finalJid,
@@ -662,11 +646,11 @@ const getFunctions = (
       requiresTrigger: finalRequiresTrigger,
       containerConfig,
       systemInstruction,
-      ephemeral, // Orchestrator will delete folder if true
+      ephemeral,
       sourceGroup: input.groupFolder,
       timestamp: new Date().toISOString(),
     });
-    return `Agent initialization requested for "${name}" (ephemeral: ${!!ephemeral}).`;
+    return `Agent initialization requested for "${name}".`;
   },
   delete_group: ({ jid }) => {
     writeIpcFile(TASKS_DIR, {
@@ -684,14 +668,14 @@ const getFunctions = (
       sourceGroup: input.groupFolder,
       timestamp: new Date().toISOString(),
     });
-    return `Physical thread deletion and sub-agent cleanup requested for JID ${jid}.`;
+    return `Thread deletion requested for JID ${jid}.`;
   },
   list_groups: () => {
     const groupsFile = '/workspace/ipc/available_groups.json';
     if (fs.existsSync(groupsFile)) {
       return fs.readFileSync(groupsFile, 'utf-8');
     }
-    return 'Group list not yet available. Please try again in a few seconds.';
+    return 'Group list not available.';
   },
   wait_for_report: async ({ folder, timeoutMs = 60000 }) => {
     const reportPath = path.join('/workspace/project/groups', folder, 'REPORT.md');
@@ -702,15 +686,15 @@ const getFunctions = (
       }
       await new Promise(r => setTimeout(r, 5000));
     }
-    return `Timeout waiting for report from ${folder} after ${timeoutMs}ms.`;
+    return `Timeout waiting for report from ${folder}.`;
   },
   append_thought: ({ text }) => {
     try {
       const thoughtPath = path.join('/workspace/group', 'THOUGHTS.log');
       fs.appendFileSync(thoughtPath, `[${new Date().toISOString()}] ${text}\n`);
-      return 'Thought appended to stream.';
+      return 'Thought appended.';
     } catch (err: any) {
-      return `Error appending thought: ${err.message}`;
+      return `Error: ${err.message}`;
     }
   },
   follow_stream: async ({ folder, timeoutMs = 30000 }) => {
@@ -719,17 +703,15 @@ const getFunctions = (
       const start = Date.now();
       let lastSize = 0;
       
-      // Wait for file to exist (be patient with NFS)
       while (Date.now() - start < 10000 && !fs.existsSync(thoughtPath)) {
         await new Promise(r => setTimeout(r, 1000));
       }
       
-      if (!fs.existsSync(thoughtPath)) return 'Stream not started yet.';
+      if (!fs.existsSync(thoughtPath)) return 'Stream not started.';
 
       lastSize = fs.statSync(thoughtPath).size;
       let newThoughts = '';
 
-      // Poll for new additions with tighter loop
       const pollStart = Date.now();
       while (Date.now() - pollStart < timeoutMs) {
         try {
@@ -743,15 +725,13 @@ const getFunctions = (
             lastSize = stats.size;
             break; 
           }
-        } catch (e) {
-          // Ignore transient stat errors on NFS
-        }
+        } catch (e) {}
         await new Promise(r => setTimeout(r, 1000));
       }
 
-      return newThoughts || 'No new thoughts in stream.';
+      return newThoughts || 'No new thoughts.';
     } catch (err: any) {
-      return `Error following stream: ${err.message}`;
+      return `Error: ${err.message}`;
     }
   },
 });
@@ -781,8 +761,6 @@ function parseMultimodalPrompt(prompt: string): any[] {
   return parts.length > 0 ? parts : [{ text: prompt }];
 }
 
-// --- MCP Management ---
-
 class McpManager {
   private clients: Map<string, Client> = new Map();
   private toolToClient: Map<string, string> = new Map();
@@ -806,14 +784,12 @@ class McpManager {
           const url = new URL(serverConfig.url);
           
           if (url.pathname.endsWith('/mcp')) {
-            // Modern Streamable HTTP (for SilverBullet)
             transport = new StreamableHTTPClientTransport(url, {
               requestInit: token ? {
                 headers: { 'Authorization': `Bearer ${token}` }
               } : undefined,
             });
           } else {
-            // Legacy SSE
             if (token) {
               url.searchParams.set('token', token);
             }
@@ -831,7 +807,6 @@ class McpManager {
             });
           }
         } else {
-          log(`Invalid config for MCP server ${name}: no command or url`);
           continue;
         }
 
@@ -840,11 +815,10 @@ class McpManager {
           { capabilities: {} }
         );
 
-        // Add timeout to connection and tool listing
         const connectPromise = client.connect(transport);
         await Promise.race([
           connectPromise,
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Connection timeout')), 5000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
         ]);
         
         this.clients.set(name, client);
@@ -852,27 +826,18 @@ class McpManager {
         const listToolsPromise = client.listTools();
         const { tools } = await Promise.race([
           listToolsPromise,
-          new Promise((_, reject) => setTimeout(() => reject(new Error('List tools timeout')), 5000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
         ]) as any;
 
         for (const tool of tools) {
-          const toolName = tool.name;
-          if (this.toolToClient.has(toolName)) {
-            log(`Warning: MCP tool collision for ${toolName}. Overwriting.`);
-          }
-          this.toolToClient.set(toolName, name);
-          
-          // Map MCP tool definition to Gemini function declaration
+          this.toolToClient.set(tool.name, name);
           this.mcpTools.push({
             name: tool.name,
             description: tool.description,
             parameters: tool.inputSchema as any,
           });
         }
-        log(`Connected to MCP server ${name} with ${tools.length} tools`);
-      } catch (err: any) {
-        log(`Failed to connect to MCP server ${name}: ${err.message}`);
-      }
+      } catch (err: any) {}
     }
   }
 
@@ -882,20 +847,17 @@ class McpManager {
 
   async callTool(name: string, args: any) {
     const serverName = this.toolToClient.get(name);
-    if (!serverName) throw new Error(`MCP tool ${name} not found`);
+    if (!serverName) throw new Error(`Tool ${name} not found`);
     
     const client = this.clients.get(serverName);
-    if (!client) throw new Error(`MCP client ${serverName} not found`);
+    if (!client) throw new Error(`Client ${serverName} not found`);
 
-    log(`Calling MCP tool ${name} on server ${serverName}`);
     const result = await client.callTool({ name, arguments: args }) as any;
-    
-    // Format MCP result for Gemini (convert Content array to string)
     const textParts = result.content
       .filter((c: any) => c.type === 'text')
       .map((c: any) => c.text);
     
-    return textParts.join('\n') || 'Success (no text output).';
+    return textParts.join('\n') || 'Success.';
   }
 
   isMcpTool(name: string) {
@@ -906,14 +868,10 @@ class McpManager {
     for (const client of this.clients.values()) {
       try {
         await client.close();
-      } catch (err) {
-        // Ignore shutdown errors
-      }
+      } catch (err) {}
     }
   }
 }
-
-// --- Main Execution ---
 
 async function main(): Promise<void> {
   let input: ContainerInput;
@@ -937,7 +895,6 @@ async function main(): Promise<void> {
   const client = new (GoogleGenAI as any)({ apiKey });
   const modelName = input.model || process.env.GEMINI_MODEL || 'gemini-2.5-pro';
   
-  // Initialize MCP
   const mcpManager = new McpManager();
   await mcpManager.initialize(input.mcpConfig);
 
@@ -956,18 +913,14 @@ async function main(): Promise<void> {
   const globalMdPath = '/workspace/global/GEMINI.md';
   const groupMdPath = '/workspace/group/GEMINI.md';
   
-  let systemPrompt = `You are ${input.assistantName || 'Andy'}, an autonomous AI agent running in a security-isolated Kubernetes pod.
-You have access to a variety of tools, including those from external MCP (Model Context Protocol) servers. 
-When a user asks you to perform a task involving these systems (like listing documents, searching links, etc.), use the corresponding tools provided to you. Do not refuse based on "isolation" if a relevant tool is available in your function list.`;
+  let systemPrompt = `You are ${input.assistantName || 'Andy'}, an autonomous AI agent running in a Kubernetes pod.`;
 
   if (fs.existsSync(groupMdPath)) {
-    // Group-specific identity takes precedence
     systemPrompt = fs.readFileSync(groupMdPath, 'utf-8');
   } else if (fs.existsSync(globalMdPath)) {
     systemPrompt += `\n\nGlobal Context:\n${fs.readFileSync(globalMdPath, 'utf-8')}`;
   }
 
-  // Combine built-in tools with MCP tools
   const allTools = [
     ...toolDeclarations,
     ...mcpManager.getToolDeclarations()
@@ -1004,11 +957,8 @@ When a user asks you to perform a task involving these systems (like listing doc
         message: parts
       });
 
-      log(`Gemini response: ${JSON.stringify(result)}`);
-
       while (result.candidates?.[0]?.content?.parts?.some((p: any) => p.functionCall)) {
         const callParts = result.candidates[0].content.parts!.filter((p: any) => p.functionCall);
-        log(`Processing ${callParts.length} parallel tool calls`);
         
         const responses = await Promise.all(callParts.map(async (part: any) => {
           const { name, args } = part.functionCall!;
@@ -1047,7 +997,7 @@ When a user asks you to perform a task involving these systems (like listing doc
       fs.mkdirSync(path.dirname(historyPath), { recursive: true });
       fs.writeFileSync(historyPath, JSON.stringify(currentChat.history));
 
-      const IDLE_EXIT_TIMEOUT_MS = 600000; // 10 minutes
+      const IDLE_EXIT_TIMEOUT_MS = 600000;
       let lastActivity = Date.now();
 
       while (true) {
@@ -1059,7 +1009,6 @@ When a user asks you to perform a task involving these systems (like listing doc
         }
         const files = fs.readdirSync(IPC_INPUT_DIR).filter(f => f.endsWith('.json')).sort();
         if (files.length > 0) {
-          // Process messages one by one to ensure we don't lose them if Gemini crashes
           const file = files[0];
           const data = JSON.parse(fs.readFileSync(path.join(IPC_INPUT_DIR, file), 'utf-8'));
           if (data.type === 'message') {
@@ -1075,14 +1024,12 @@ When a user asks you to perform a task involving these systems (like listing doc
         }
 
         if (Date.now() - lastActivity > IDLE_EXIT_TIMEOUT_MS) {
-          log('Idle timeout reached, exiting.');
           return;
         }
 
         await new Promise(r => setTimeout(r, IPC_POLL_MS));
       }
     } catch (err: any) {
-      log(`Gemini Error: ${err.message}`);
       writeOutput({ status: 'error', result: null, error: err.message });
       await mcpManager.shutdown();
       return;

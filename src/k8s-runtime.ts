@@ -5,13 +5,12 @@
 import * as k8s from '@kubernetes/client-node';
 import path from 'path';
 import { logger } from './logger.js';
+import { K8S_NAMESPACE } from './config.js';
 
 const kc = new k8s.KubeConfig();
 kc.loadFromDefault();
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
 const batchApi = kc.makeApiClient(k8s.BatchV1Api);
-
-export const K8S_NAMESPACE = process.env.K8S_NAMESPACE || 'default';
 
 export async function runBuildJob(
   imageTag: string,
