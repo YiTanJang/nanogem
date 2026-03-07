@@ -159,8 +159,7 @@ nanoclaw/
 │   ├── nanoclaw.log               # Host stdout
 │   └── nanoclaw.error.log         # Host stderr
 │
-└── launchd/
-    └── com.nanoclaw.plist         # macOS service configuration
+└── registry.yaml                  # Kubernetes registry config
 ```
 
 ---
@@ -307,8 +306,8 @@ Discord messages could contain malicious instructions attempting to manipulate G
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| No response | Service not running | Check systemctl/launchctl status |
-| Container failed | Runtime missing | Ensure Docker or Kubernetes is running |
+| No response | Pod not running | Check `kubectl get pods -n nanoclaw` |
+| Container failed | Runtime missing | Ensure Kubernetes cluster is running |
 | "Unauthorized" | Group not registered | Register the channel from main |
 
 ### Log Location

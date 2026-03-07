@@ -4,23 +4,19 @@
 
 ```bash
 # 1. Is the service running?
-# Linux (systemd)
-systemctl --user status nanoclaw
-# macOS (launchd)
-launchctl list | grep nanoclaw
-
-# 2. Any running containers or pods?
-docker ps --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
 kubectl get pods -n nanoclaw
 
+# 2. Any running agent pods?
+kubectl get pods -n nanoclaw | grep agent
+
 # 3. Recent errors in service log?
-grep -E 'ERROR|WARN' logs/nanoclaw.log | tail -20
+kubectl logs deployment/nanoclaw -n nanoclaw --tail=100 | grep -E 'ERROR|WARN'
 
 # 4. Is Discord connected?
-grep -E 'Connected to Discord|Discord connection' logs/nanoclaw.log | tail -5
+kubectl logs deployment/nanoclaw -n nanoclaw --tail=100 | grep -E 'Connected to Discord|Discord connection'
 
 # 5. Are groups loaded?
-grep 'groupCount' logs/nanoclaw.log | tail -3
+kubectl logs deployment/nanoclaw -n nanoclaw --tail=100 | grep 'groupCount'
 ```
 
 ## Session Transcript Investigation
@@ -100,17 +96,13 @@ grep -i 'failed to connect to discord' logs/nanoclaw.log | tail -5
 ## Service Management
 
 ```bash
-# Linux (systemd)
-systemctl --user restart nanoclaw
-systemctl --user stop nanoclaw
-systemctl --user start nanoclaw
-
-# macOS (launchd)
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+# Restart the orchestrator
+kubectl rollout restart deployment nanoclaw -n nanoclaw
 
 # View live logs
-tail -f logs/nanoclaw.log
+kubectl logs -f deployment/nanoclaw -n nanoclaw
 
 # Rebuild and restart after code changes
-npm run build && systemctl --user restart nanoclaw
+# (Assuming your K8s deployment mounts the NAS volume where you build)
+npm run build && kubectl rollout restart deployment nanoclaw -n nanoclaw
 ```

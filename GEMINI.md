@@ -41,17 +41,13 @@ npm run build        # Compile TypeScript
 ./container/build.sh # Rebuild agent container
 ```
 
-Service management:
+Service management (Kubernetes):
 ```bash
-# macOS (launchd)
-launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
-launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # restart
+# Restart the orchestrator
+kubectl rollout restart deployment nanoclaw -n nanoclaw
 
-# Linux (systemd)
-systemctl --user start nanoclaw
-systemctl --user stop nanoclaw
-systemctl --user restart nanoclaw
+# View logs
+kubectl logs -f deployment/nanoclaw -n nanoclaw
 ```
 
 ## Container Build Cache
