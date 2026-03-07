@@ -420,13 +420,13 @@ async function main(): Promise<void> {
     }
   }
 
-  logger.info(`NanoClaw running (trigger: @${ASSISTANT_NAME})`);
+  logger.info(`NanoGem running (trigger: @${ASSISTANT_NAME})`);
 }
 
 const isDirectRun = process.argv[1] && new URL(import.meta.url).pathname === new URL(`file://${process.argv[1]}`).pathname;
 if (isDirectRun) {
   main().catch((err) => {
-    logger.error({ err }, 'Failed to start NanoClaw');
+    logger.error({ err }, 'Failed to start NanoGem');
     process.exit(1);
   });
 }

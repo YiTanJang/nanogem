@@ -7,7 +7,7 @@ import path from 'path';
 import { parse as parseYaml } from 'yaml';
 
 import { clearBackup, createBackup, restoreBackup } from './backup.js';
-import { BASE_DIR, NANOCLAW_DIR } from './constants.js';
+import { BASE_DIR, NANOGEM_DIR } from './constants.js';
 import { copyDir } from './fs-utils.js';
 import { isCustomizeActive } from './customize.js';
 import { acquireLock } from './lock.js';
@@ -231,7 +231,7 @@ export async function applyUpdate(newCorePath: string): Promise<UpdateResult> {
     // --- Record path remaps from update metadata ---
     const remapFile = path.join(
       newCorePath,
-      '.nanoclaw-meta',
+      '.nanogem-meta',
       'path_remap.yaml',
     );
     if (fs.existsSync(remapFile)) {

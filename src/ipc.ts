@@ -242,7 +242,7 @@ export async function processTaskIpc(
         // (For now we allow any registered group to write to any other if they know the JID, 
         // as the tool itself is only available to agents)
         
-        const missionDir = path.join(GROUPS_DIR, targetFolder, '.nanoclaw');
+        const missionDir = path.join(GROUPS_DIR, targetFolder, '.nanogem');
         fs.mkdirSync(missionDir, { recursive: true });
         fs.writeFileSync(path.join(missionDir, 'mission.json'), JSON.stringify(data.mission, null, 2));
         logger.info({ from: sourceGroup, to: targetFolder }, 'Mission written to disk');
@@ -504,7 +504,7 @@ export async function processTaskIpc(
             deps.registerGroup(thread.jid, {
               name: data.name,
               folder: data.folder,
-              trigger: data.trigger || '@NanoClaw', // Threads usually don't strictly need a trigger but good to have
+              trigger: data.trigger || '@NanoGem', // Threads usually don't strictly need a trigger but good to have
               added_at: new Date().toISOString(),
               containerConfig: data.containerConfig,
               requiresTrigger: false, // DMs and Threads are exclusive contexts
@@ -543,16 +543,20 @@ export async function processTaskIpc(
     case 'build_project':
       if (isMain && deps.runBuildJob) {
         const isSelf = data.type === 'rebuild_self';
-        const defaultImage = isSelf ? `${REGISTRY_URL}/${CONTAINER_IMAGE_BASE}-agent:latest` : '';
+
+        // Use the injected REGISTRY_URL environment variable
+        const registry = process.env.REGISTRY_URL || 'localhost:5000';
+        
+        // Default to agent image for rebuild_self
+        const defaultImage = isSelf ? `${registry}/${CONTAINER_IMAGE_BASE}-agent:latest` : '';
         const imageTag = data.imageTag || defaultImage;
         const pvcName = K8S_PVC_NAME;
         const pvcSubPath = K8S_PVC_SUBPATH;
-        
-        // FORBID custom Dockerfiles/contexts for rebuild_self
-        const dockerfilePath = isSelf ? 'Dockerfile' : (data.dockerfilePath || 'Dockerfile');
-        const contextPath = isSelf ? '.' : (data.contextPath || '.');
-        const shouldRollout = isSelf || !!data.shouldRollout;
 
+        // Special handling for orchestrator vs agent
+        const dockerfilePath = isSelf ? (data.dockerfilePath || 'Dockerfile') : (data.dockerfilePath || 'Dockerfile');
+        const contextPath = isSelf ? (data.contextPath || 'container') : (data.contextPath || '.');
+        const shouldRollout = isSelf || !!data.shouldRollout;
         // If this is a self-rebuild, arm the autostart resurrection pulse
         if (isSelf) {
           const autostartDir = path.join(DATA_DIR, 'autostart');
@@ -573,7 +577,7 @@ export async function processTaskIpc(
 
         // Use a deterministic job name based on the data if possible to prevent duplicates on recovery
         const jobSuffix = data.timestamp ? data.timestamp.replace(/[^a-zA-Z0-9]/g, '-') : Date.now();
-        const customJobName = `nanoclaw-build-${jobSuffix}`.slice(0, 63).toLowerCase();
+        const customJobName = `nanogem-build-${jobSuffix}`.slice(0, 63).toLowerCase();
 
         if (isSelf) {
           logger.info({ imageTag, customJobName }, 'Rebuild self requested (Security Restricted Context)');

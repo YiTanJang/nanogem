@@ -1,4 +1,4 @@
-# NanoClaw Agent Container
+# NanoGem Agent Container
 # Runs Gemini API in isolated Linux VM with browser automation
 
 FROM node:22-slim

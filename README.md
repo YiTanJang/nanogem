@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="assets/nanoclaw-logo.png" alt="NanoClaw" width="400">
+  <img src="assets/nanoclaw-logo.png" alt="NanoGem" width="400">
 </p>
 
 <p align="center">
-  <b>NanoClaw: The Kubernetes-Native Agent Swarm</b><br>
+  <b>NanoGem: The Kubernetes-Native Agent Swarm</b><br>
   A 2026 SOTA private AI assistant focused on hard isolation, structured memory, and hierarchical orchestration.
 </p>
 
@@ -11,7 +11,7 @@
 
 ## 🧬 The Philosophy
 
-NanoClaw is not a "chatbot." It is an **Agent Operating System** built for users who demand absolute security and structured intelligence. Unlike frameworks that run agents in a single process, NanoClaw treats every agent as a first-class citizen in your Kubernetes cluster.
+NanoGem is not a "chatbot." It is an **Agent Operating System** built for users who demand absolute security and structured intelligence. Unlike frameworks that run agents in a single process, NanoGem treats every agent as a first-class citizen in your Kubernetes cluster.
 
 ### Core Pillars
 - **Hard Isolation**: Every agent lives in its own Kubernetes Pod. They see only what you mount.
@@ -36,9 +36,14 @@ NanoClaw is not a "chatbot." It is an **Agent Operating System** built for users
 
 ### Prerequisites
 - A Kubernetes cluster (K3s, EKS, or a NAS-based cluster).
-- A private container registry.
+- **A Container Registry**: NanoGem builds and spawns agents as pods. You must have a registry (e.g., Docker Hub, GitHub Packages, or a local registry) that your cluster can reach.
 - A Discord Bot Token.
 - A Gemini API Key.
+
+### Registry Configuration
+During the setup process, you will be asked for your **Registry URL**.
+- If using a local NAS registry, use the format: `IP_ADDRESS:PORT` (e.g., `192.168.1.100:5000`).
+- Ensure your Kubernetes nodes are configured to trust this registry if it is insecure.
 
 ### Installation
 1. **Clone the repo**:
@@ -62,7 +67,7 @@ NanoClaw is not a "chatbot." It is an **Agent Operating System** built for users
 
 ## 🧠 Memory Structure (2026 SOTA)
 
-NanoClaw uses a tiered memory system to maintain high focus:
+NanoGem uses a tiered memory system to maintain high focus:
 1. **Working Memory**: Current chat history + active mission.
 2. **Episodic Memory**: The last 5 mission reports (`episodes/`).
 3. **Semantic Memory**: Distilled permanent truths (`facts.md`).
@@ -72,13 +77,13 @@ NanoClaw uses a tiered memory system to maintain high focus:
 
 ## 🛠 Customizing
 
-NanoClaw follows the **"Code is Config"** mantra. Want to change how the agent thinks? Edit the instructions in `groups/global/GEMINI.md`. Want to add a new tool? Modify `container/agent-runner/src/index.ts` and call `rebuild_self()`.
+NanoGem follows the **"Code is Config"** mantra. Want to change how the agent thinks? Edit the instructions in `groups/global/GEMINI.md`. Want to add a new tool? Modify `container/agent-runner/src/index.ts` and call `rebuild_self()`.
 
 ---
 
 ## 🛡 Security
 
-NanoClaw uses a **Defense-in-Depth** model:
+NanoGem uses a **Defense-in-Depth** model:
 - **Sandbox**: Agents cannot escape their Kubernetes Pod.
 - **Mounts**: Only explicitly allowed directories are visible to agents.
 - **Filter**: Sensitive environment variables are never exposed to sub-agents.

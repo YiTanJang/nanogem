@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: nanoclaw-controller
-  namespace: nanoclaw
+  name: nanogem-controller
+  namespace: nanogem
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  namespace: nanoclaw
-  name: nanoclaw-pod-manager
+  namespace: nanogem
+  name: nanogem-pod-manager
 rules:
 - apiGroups: ["", "batch"]
   resources: ["pods", "pods/log", "pods/status", "jobs", "jobs/status"]
@@ -17,107 +17,107 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: nanoclaw-pod-manager-binding
-  namespace: nanoclaw
+  name: nanogem-pod-manager-binding
+  namespace: nanogem
 subjects:
 - kind: ServiceAccount
-  name: nanoclaw-controller
-  namespace: nanoclaw
+  name: nanogem-controller
+  namespace: nanogem
 roleRef:
   kind: Role
-  name: nanoclaw-pod-manager
+  name: nanogem-pod-manager
   apiGroup: rbac.authorization.k8s.io
 ---
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: nanoclaw-builder
-  namespace: nanoclaw
+  name: nanogem-builder
+  namespace: nanogem
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: nanoclaw-builder-role
-  namespace: nanoclaw
+  name: nanogem-builder-role
+  namespace: nanogem
 rules:
   - apiGroups: ["apps"]
     resources: ["deployments"]
-    resourceNames: ["nanoclaw"]
+    resourceNames: ["nanogem"]
     verbs: ["get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: nanoclaw-builder-binding
-  namespace: nanoclaw
+  name: nanogem-builder-binding
+  namespace: nanogem
 subjects:
   - kind: ServiceAccount
-    name: nanoclaw-builder
-    namespace: nanoclaw
+    name: nanogem-builder
+    namespace: nanogem
 roleRef:
   kind: Role
-  name: nanoclaw-builder-role
+  name: nanogem-builder-role
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nanoclaw
-  namespace: nanoclaw
+  name: nanogem
+  namespace: nanogem
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nanoclaw
+      app: nanogem
   template:
     metadata:
       labels:
-        app: nanoclaw
+        app: nanogem
     spec:
-      serviceAccountName: nanoclaw-controller
+      serviceAccountName: nanogem-controller
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
       containers:
       - name: controller
-        image: <REGISTRY_IP>:30500/nanoclaw:latest
+        image: <REGISTRY_IP>:30500/nanogem:latest
         imagePullPolicy: Always
         workingDir: /app
         env:
         - name: GEMINI_API_KEY
           valueFrom:
             secretKeyRef:
-              name: nanoclaw-secrets
+              name: nanogem-secrets
               key: GEMINI_API_KEY
         - name: CONTAINER_RUNTIME
           value: "k8s"
         - name: K8S_NAMESPACE
-          value: "nanoclaw"
+          value: "nanogem"
         - name: K8S_PVC_NAME
-          value: "nanoclaw-pvc-final"
+          value: "nanogem-pvc-final"
         - name: K8S_PVC_SUBPATH
           value: "."
         - name: CONTAINER_IMAGE
-          value: "<REGISTRY_IP>:30500/nanoclaw-agent:latest"
+          value: "<REGISTRY_IP>:30500/nanogem-agent:latest"
         - name: DISCORD_BOT_TOKEN
           valueFrom:
             secretKeyRef:
-              name: nanoclaw-secrets
+              name: nanogem-secrets
               key: DISCORD_BOT_TOKEN
         - name: GIT_AUTHOR_NAME
           value: "Andy (NanoClaw Swarm)"
         - name: GIT_AUTHOR_EMAIL
-          value: "andy@nanoclaw.local"
+          value: "andy@nanogem.local"
         - name: GIT_COMMITTER_NAME
           value: "Andy (NanoClaw Swarm)"
         - name: GIT_COMMITTER_EMAIL
-          value: "andy@nanoclaw.local"
+          value: "andy@nanogem.local"
         volumeMounts:
         - name: storage
           mountPath: /app
       volumes:
       - name: storage
         persistentVolumeClaim:
-          claimName: nanoclaw-pvc-final
+          claimName: nanogem-pvc-final

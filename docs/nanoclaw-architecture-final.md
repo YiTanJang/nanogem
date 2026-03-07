@@ -1,4 +1,4 @@
-# NanoClaw Skills Architecture
+# NanoGem Skills Architecture
 
 ## Core Principle
 
@@ -20,13 +20,13 @@ The goal is that Level 1 handles everything on a mature, well-tested installatio
 
 Many users clone the repo without forking, don't commit their changes, and don't think of themselves as git users. The system must work safely for them without requiring any git knowledge.
 
-Before any operation, the system copies all files that will be modified to `.nanoclaw/backup/`. On success, the backup is deleted. On failure, the backup is restored. This provides rollback safety regardless of whether the user commits, pushes, or understands git.
+Before any operation, the system copies all files that will be modified to `.nanogem/backup/`. On success, the backup is deleted. On failure, the backup is restored. This provides rollback safety regardless of whether the user commits, pushes, or understands git.
 
 ---
 
 ## 1. The Shared Base
 
-`.nanoclaw/base/` holds the clean core — the original codebase before any skills or customizations were applied. This is the stable common ancestor for all three-way merges, and it only changes on core updates.
+`.nanogem/base/` holds the clean core — the original codebase before any skills or customizations were applied. This is the stable common ancestor for all three-way merges, and it only changes on core updates.
 
 - `git merge-file` uses the base to compute two diffs: what the user changed (current vs base) and what the skill wants to change (base vs skill's modified file), then combines both
 - The base enables drift detection: if a file's hash differs from its base hash, something has been modified (skills, user customizations, or both)
@@ -117,9 +117,9 @@ skills/
 
 - `git merge-file` requires three full files — no intermediate reconstruction step
 - Git's three-way merge uses context matching, so it works even if the user has moved code around — unlike line-number-based diffs that break immediately
-- Auditable: `diff .nanoclaw/base/src/index.ts skills/add-telegram/modify/src/index.ts` shows exactly what the skill changes
+- Auditable: `diff .nanogem/base/src/index.ts skills/add-telegram/modify/src/index.ts` shows exactly what the skill changes
 - Deterministic: same three inputs always produce the same merge result
-- Size is negligible since NanoClaw's core files are small
+- Size is negligible since NanoGem's core files are small
 
 ### Intent Files
 
@@ -181,7 +181,7 @@ depends: []                # Skills that must be applied first
 test: "npx vitest run src/channels/telegram.test.ts"
 
 # --- Future fields (not yet implemented in v0.1) ---
-# author: nanoclaw-team
+# author: nanogem-team
 # license: MIT
 # min_skills_system_version: "0.1.0"
 # tested_with: [telegram@1.0.0]
@@ -234,7 +234,7 @@ Recorded in `state.yaml`:
 applied_skills:
   - skill: telegram
     version: 1.0.0
-    custom_patch: .nanoclaw/custom/telegram-group-only.patch
+    custom_patch: .nanogem/custom/telegram-group-only.patch
     custom_patch_description: "Restrict bot responses to group chats only"
 ```
 
@@ -293,7 +293,7 @@ When a user runs the skill's slash command in Gemini CLI:
 
 ### Step 2: Backup
 
-Copy all files that will be modified to `.nanoclaw/backup/`. If the operation fails at any point, restore from backup.
+Copy all files that will be modified to `.nanogem/backup/`. If the operation fails at any point, restore from backup.
 
 ### Step 3: File Operations
 
@@ -310,7 +310,7 @@ cp skills/add-whatsapp/add/src/channels/whatsapp.ts src/channels/whatsapp.ts
 For each file in `modifies` (with path remapping applied):
 
 ```bash
-git merge-file src/server.ts .nanoclaw/base/src/server.ts skills/add-whatsapp/modify/src/server.ts
+git merge-file src/server.ts .nanogem/base/src/server.ts skills/add-whatsapp/modify/src/server.ts
 ```
 
 - **Exit code 0**: clean merge, move on
@@ -318,7 +318,7 @@ git merge-file src/server.ts .nanoclaw/base/src/server.ts skills/add-whatsapp/mo
 
 ### Step 6: Conflict Resolution (Three-Level)
 
-1. **Check shared resolution cache** (`.nanoclaw/resolutions/`) — load into local `git rerere` if a verified resolution exists for this skill combination. **Only apply if input hashes match exactly** (base hash + current hash + skill modified hash).
+1. **Check shared resolution cache** (`.nanogem/resolutions/`) — load into local `git rerere` if a verified resolution exists for this skill combination. **Only apply if input hashes match exactly** (base hash + current hash + skill modified hash).
 2. **`git rerere`** — checks local cache. If found, applied automatically. Done.
 3. **Gemini CLI** — reads conflict markers + `SKILL.md` + `.intent.md` (Invariants, Must-keep sections) of current and previously applied skills. Resolves. `git rerere` caches the resolution.
 4. **User** — if Gemini CLI cannot determine intent, it asks the user for the desired behavior.
@@ -336,15 +336,15 @@ Collect all structured declarations (from this skill and any previously applied 
 ### Step 8: Post-Apply and Validate
 
 1. Run any `post_apply` commands (non-structured operations only)
-2. Update `.nanoclaw/state.yaml` — skill record, file hashes (base, skill, merged per file), structured outcomes
+2. Update `.nanogem/state.yaml` — skill record, file hashes (base, skill, merged per file), structured outcomes
 3. **Run skill tests** — mandatory, even if all merges were clean
 4. If tests fail on a clean merge → escalate to Level 2 (Gemini CLI diagnoses the semantic conflict)
 
 ### Step 9: Clean Up
 
-If tests pass, delete `.nanoclaw/backup/`. The operation is complete.
+If tests pass, delete `.nanogem/backup/`. The operation is complete.
 
-If tests fail and Level 2 can't resolve, restore from `.nanoclaw/backup/` and report the failure.
+If tests fail and Level 2 can't resolve, restore from `.nanogem/backup/` and report the failure.
 
 ---
 
@@ -352,11 +352,11 @@ If tests fail and Level 2 can't resolve, restore from `.nanoclaw/backup/` and re
 
 ### The Problem
 
-`git rerere` is local by default. But NanoClaw has thousands of users applying the same skill combinations. Every user hitting the same conflict and waiting for Gemini CLI to resolve it is wasteful.
+`git rerere` is local by default. But NanoGem has thousands of users applying the same skill combinations. Every user hitting the same conflict and waiting for Gemini CLI to resolve it is wasteful.
 
 ### The Solution
 
-NanoClaw maintains a verified resolution cache in `.nanoclaw/resolutions/` that ships with the project. This is the shared artifact — **not** `.git/rr-cache/`, which stays local.
+NanoGem maintains a verified resolution cache in `.nanogem/resolutions/` that ships with the project. This is the shared artifact — **not** `.git/rr-cache/`, which stays local.
 
 #### Implication: Git Repository Required
 
@@ -366,7 +366,7 @@ The adapter requires `git hash-object`, `git update-index`, and `.git/rr-cache/`
 
 ## 8. State Tracking
 
-`.nanoclaw/state.yaml` records everything about the installation.
+`.nanogem/state.yaml` records everything about the installation.
 
 ---
 
@@ -401,7 +401,7 @@ There is no unrecoverable state.
 
 ## 10. Core Updates
 
-Core updates must be as programmatic as possible. The NanoClaw team is responsible for ensuring updates apply cleanly to common skill combinations.
+Core updates must be as programmatic as possible. The NanoGem team is responsible for ensuring updates apply cleanly to common skill combinations.
 
 ### How Migrations Work During Updates
 
@@ -463,7 +463,7 @@ Given `state.yaml`, reproduce the exact installation on a fresh machine with no 
 2. **Three-level resolution: git → Gemini CLI → user.** Programmatic first, AI second, human third.
 3. **Clean merges aren't enough.** Tests run after every operation.
 4. **All operations are safe.** Backup before, restore on failure.
-5. **One shared base.** `.nanoclaw/base/` is the clean core before any skills or customizations.
+5. **One shared base.** `.nanogem/base/` is the clean core before any skills or customizations.
 6. **Code merges vs. structured operations.** Source code is three-way merged. Dependencies, env vars, and configs are aggregated programmatically.
 7. **Resolutions are learned and shared.** Maintainers resolve conflicts and ship verified resolutions with hash enforcement.
 8. **One skill, one happy path.** Customization is more patching.

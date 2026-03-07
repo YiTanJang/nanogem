@@ -10,7 +10,7 @@ import { readEnvFile } from './env.js';
 const envConfig = readEnvFile(['ASSISTANT_NAME']);
 
 export const ASSISTANT_NAME =
-  process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'NanoClaw';
+  process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'NanoGem';
 export const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 export const POLL_INTERVAL = 2000;
 export const SCHEDULER_POLL_INTERVAL = 60000;
@@ -23,7 +23,7 @@ const HOME_DIR = process.env.HOME || os.homedir();
 export const MOUNT_ALLOWLIST_PATH = path.join(
   HOME_DIR,
   '.config',
-  'nanoclaw',
+  'nanogem',
   'mount-allowlist.json',
 );
 export const STORE_DIR = path.resolve(PROJECT_ROOT, 'store');
@@ -32,13 +32,13 @@ export const DATA_DIR = path.resolve(PROJECT_ROOT, 'data');
 export const MAIN_GROUP_FOLDER = 'main';
 
 // --- Cognitive Memory Constants ---
-export const MEMORY_DIR_NAME = '.nanoclaw/memory';
+export const MEMORY_DIR_NAME = '.nanogem/memory';
 export const CONTINUUM_DIR_NAME = 'continuum';
 export const EPISODES_DIR_NAME = 'episodes';
 
 // --- Registry & Image Configuration ---
 export const REGISTRY_URL = process.env.REGISTRY_URL || 'localhost:5000';
-export const CONTAINER_IMAGE_BASE = process.env.CONTAINER_IMAGE_BASE || 'nanoclaw';
+export const CONTAINER_IMAGE_BASE = process.env.CONTAINER_IMAGE_BASE || 'nanogem';
 
 /** The full image path for spawned agent pods. */
 export const CONTAINER_IMAGE =
@@ -72,10 +72,10 @@ export const TIMEZONE =
 
 // --- Kubernetes Configuration ---
 /** Kubernetes namespace for agent pods. */
-export const K8S_NAMESPACE = process.env.K8S_NAMESPACE || 'default';
+export const K8S_NAMESPACE = process.env.K8S_NAMESPACE || 'nanogem';
 
 /** Kubernetes PVC name for agent memory. */
-export const K8S_PVC_NAME = process.env.K8S_PVC_NAME || 'nanoclaw-pvc';
+export const K8S_PVC_NAME = process.env.K8S_PVC_NAME || 'nanogem-pvc-final';
 
 /** PVC subpath where project root is located. */
 export const K8S_PVC_SUBPATH = process.env.K8S_PVC_SUBPATH || '.';

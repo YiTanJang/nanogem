@@ -1,5 +1,5 @@
 /**
- * Kubernetes Runtime for NanoClaw
+ * Kubernetes Runtime for NanoGem
  * Manages agent sandboxes as native Kubernetes pods
  */
 import * as k8s from '@kubernetes/client-node';
@@ -21,7 +21,7 @@ export async function runBuildJob(
   shouldRollout: boolean = false,
   customJobName?: string,
 ): Promise<{ status: 'success' | 'error'; error?: string }> {
-  const jobName = customJobName || `nanoclaw-build-${Date.now()}`;
+  const jobName = customJobName || `nanogem-build-${Date.now()}`;
   
   // Resolve context path relative to the internal container mount point
   const fullContextPath = path.join('/workspace/project', contextPath);
@@ -31,7 +31,7 @@ export async function runBuildJob(
     spec: {
       template: {
         spec: {
-          serviceAccountName: 'nanoclaw-builder',
+          serviceAccountName: 'nanogem-builder',
           restartPolicy: 'Never',
           containers: [
             {
@@ -70,7 +70,7 @@ export async function runBuildJob(
                 done
                 if [ "${shouldRollout}" = "true" ]; then
                   echo "Build successful, triggering rollout..."
-                  kubectl patch deployment nanoclaw -p "{\\\"spec\\\":{\\\"template\\\":{\\\"metadata\\\":{\\\"annotations\\\":{\\\"kubectl.kubernetes.io/restartedAt\\\":\\\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\\"}}}}} "
+                  kubectl patch deployment nanogem -p "{\\\"spec\\\":{\\\"template\\\":{\\\"metadata\\\":{\\\"annotations\\\":{\\\"kubectl.kubernetes.io/restartedAt\\\":\\\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\\"}}}}} "
                 else
                   echo "Build successful, skipping rollout as requested."
                 fi
@@ -170,11 +170,11 @@ export async function cleanupOrphans(): Promise<void> {
     // Cleanup agent pods using both legacy and current labels
     const res = await k8sApi.listNamespacedPod({
       namespace: K8S_NAMESPACE,
-      labelSelector: 'app.kubernetes.io/managed-by=nanoclaw',
+      labelSelector: 'app.kubernetes.io/managed-by=nanogem',
     });
     const res2 = await k8sApi.listNamespacedPod({
       namespace: K8S_NAMESPACE,
-      labelSelector: 'nanoclaw.io/group',
+      labelSelector: 'nanogem.io/group',
     });
 
     const pods = [...(res.items || []), ...(res2.items || [])];
@@ -200,7 +200,7 @@ export async function cleanupOrphans(): Promise<void> {
     });
     const jobs = jobRes.items || [];
     for (const job of jobs) {
-      if (job.metadata?.name?.startsWith('nanoclaw-build-')) {
+      if (job.metadata?.name?.startsWith('nanogem-build-')) {
         const status = job.status;
         if (status?.succeeded || status?.failed) {
           logger.info({ job: job.metadata.name }, 'Cleaning up completed build job');

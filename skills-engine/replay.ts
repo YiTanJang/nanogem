@@ -3,7 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { BASE_DIR, NANOCLAW_DIR, SKILLS_DIR } from './constants.js';
+import { BASE_DIR, NANOGEM_DIR, SKILLS_DIR } from './constants.js';
 import { copyDir } from './fs-utils.js';
 import { readManifest } from './manifest.js';
 import { mergeFile } from './merge.js';
@@ -29,7 +29,7 @@ export interface ReplayResult {
 }
 
 /**
- * Scan .nanoclaw/skills/ for a directory whose manifest.yaml has skill: <skillName>.
+ * Scan .nanogem/skills/ for a directory whose manifest.yaml has skill: <skillName>.
  */
 export function findSkillDir(
   skillName: string,

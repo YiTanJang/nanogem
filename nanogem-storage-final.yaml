@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: nanoclaw-pv-final
+  name: nanogem-pv-final
 spec:
   capacity:
     storage: 1800Gi
@@ -15,14 +15,14 @@ spec:
     - tcp
     - nolock
   nfs:
-    path: /path/to/your/project/on/nfs
-    server: <NFS_SERVER_IP>
+    path: /export/Private_Data/app_data/nanogem/project
+    server: 10.0.0.200
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: nanoclaw-pvc-final
-  namespace: nanoclaw
+  name: nanogem-pvc-final
+  namespace: nanogem
 spec:
   storageClassName: ""
   accessModes:
@@ -30,4 +30,4 @@ spec:
   resources:
     requests:
       storage: 1800Gi
-  volumeName: nanoclaw-pv-final
+  volumeName: nanogem-pv-final

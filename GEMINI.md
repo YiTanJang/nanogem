@@ -1,4 +1,4 @@
-# NanoClaw
+# NanoGem
 
 Personal Gemini assistant. See [README.md](README.md) for philosophy and setup. See [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) for architecture decisions.
 
@@ -27,7 +27,7 @@ Single Node.js process that connects to Discord, routes messages to Gemini API r
 |-------|-------------|
 | `/customize` | Adding channels, integrations, changing behavior |
 | `/debug` | Container issues, logs, troubleshooting |
-| `/update` | Pull upstream NanoClaw changes, merge with customizations, run migrations |
+| `/update` | Pull upstream NanoGem changes, merge with customizations, run migrations |
 | `/qodo-pr-resolver` | Fetch and fix Qodo PR review issues interactively or in batch |
 | `/get-qodo-rules` | Load org- and repo-level coding rules from Qodo before code tasks |
 

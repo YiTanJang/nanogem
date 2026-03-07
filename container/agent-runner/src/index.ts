@@ -1,5 +1,5 @@
 /**
- * NanoClaw Agent Runner (Gemini 2026 Edition)
+ * NanoGem Agent Runner (Gemini 2026 Edition)
  * Runs inside a Kubernetes pod, receives config via stdin, outputs result to stdout.
  * Uses the modern @google/genai unified SDK.
  */
@@ -40,8 +40,8 @@ interface ContainerOutput {
   error?: string;
 }
 
-const OUTPUT_START_MARKER = '---NANOCLAW_OUTPUT_START---';
-const OUTPUT_END_MARKER = '---NANOCLAW_OUTPUT_END---';
+const OUTPUT_START_MARKER = '---NANOGEM_OUTPUT_START---';
+const OUTPUT_END_MARKER = '---NANOGEM_OUTPUT_END---';
 const IPC_DIR = '/workspace/ipc';
 const IPC_INPUT_DIR = path.join(IPC_DIR, 'input');
 const IPC_MESSAGES_DIR = path.join(IPC_DIR, 'messages');
@@ -49,7 +49,7 @@ const TASKS_DIR = path.join(IPC_DIR, 'tasks');
 const IPC_INPUT_CLOSE_SENTINEL = path.join(IPC_INPUT_DIR, '_close');
 const IPC_POLL_MS = 1000;
 
-const MEMORY_DIR = '/workspace/group/.nanoclaw/memory';
+const MEMORY_DIR = '/workspace/group/.nanogem/memory';
 const CONTINUUM_DIR = path.join(MEMORY_DIR, 'continuum');
 const EPISODES_DIR = path.join(MEMORY_DIR, 'episodes');
 
@@ -328,7 +328,7 @@ const toolDeclarations = [
   },
   {
     name: 'rebuild_self',
-    description: 'Trigger a build job to recompile NanoClaw and restart the orchestrator.',
+    description: 'Trigger a build job to recompile NanoGem and restart the orchestrator.',
     parameters: {
       type: 'OBJECT' as const,
       properties: {
@@ -660,7 +660,7 @@ const getFunctions = (
   },
   submit_work: ({ result }) => {
     // Read the current mission to know who to report back to
-    const missionPath = path.join('/workspace/group', '.nanoclaw', 'mission.json');
+    const missionPath = path.join('/workspace/group', '.nanogem', 'mission.json');
     let reportJid = input.chatJid; // Fallback to current chat
     
     if (fs.existsSync(missionPath)) {
@@ -957,7 +957,7 @@ class McpManager {
         }
 
         const client = new Client(
-          { name: 'nanoclaw-agent', version: '1.0.0' },
+          { name: 'nanogem-agent', version: '1.0.0' },
           { capabilities: {} }
         );
 
@@ -1058,8 +1058,8 @@ async function main(): Promise<void> {
   await mcpManager.initialize(input.mcpConfig);
 
   const functions = getFunctions(input, client, modelName);
-  const historyPath = path.join('/workspace/group', '.nanoclaw', 'history.json');
-  const missionPath = path.join('/workspace/group', '.nanoclaw', 'mission.json');
+  const historyPath = path.join('/workspace/group', '.nanogem', 'history.json');
+  const missionPath = path.join('/workspace/group', '.nanogem', 'mission.json');
 
   let history: any[] = [];
   if (fs.existsSync(historyPath)) {

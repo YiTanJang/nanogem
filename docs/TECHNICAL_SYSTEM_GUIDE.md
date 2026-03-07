@@ -1,4 +1,4 @@
-# NanoClaw Technical System Guide (For Autonomous Agents)
+# NanoGem Technical System Guide (For Autonomous Agents)
 
 This document provides the necessary architectural details for Andy to understand and improve himself.
 

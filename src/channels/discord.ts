@@ -52,7 +52,7 @@ export class DiscordChannel implements Channel {
 
       this.client.on('messageCreate', async (message) => {
         // Ignore messages from self (by ID or by name backstop)
-        if (message.author.id === this.client.user?.id || message.author.username.includes('NanoClaw')) {
+        if (message.author.id === this.client.user?.id || message.author.username.includes('NanoGem')) {
           return;
         }
 
@@ -239,7 +239,7 @@ export class DiscordChannel implements Channel {
     const thread = await (parentChannel as any).threads.create({
       name,
       autoArchiveDuration: 1440, // 24 hours
-      reason: 'NanoClaw autonomous thread creation',
+      reason: 'NanoGem autonomous thread creation',
     });
 
     return {
@@ -253,7 +253,7 @@ export class DiscordChannel implements Channel {
       const threadId = jid.replace('discord-', '');
       const channel = await this.client.channels.fetch(threadId);
       if (channel && channel.isThread()) {
-        await channel.delete('NanoClaw autonomous thread deletion');
+        await channel.delete('NanoGem autonomous thread deletion');
         logger.info({ jid }, 'Discord thread physically deleted');
       } else {
         logger.warn({ jid }, 'Discord channel is not a thread, cannot delete');

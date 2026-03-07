@@ -12,7 +12,7 @@ const question = (query: string): Promise<string> =>
   new Promise((resolve) => rl.question(query, resolve));
 
 async function main() {
-  console.log('\n=== NanoClaw Kubernetes Setup ===\n');
+  console.log('\n=== NanoGem Kubernetes Setup ===\n');
 
   // 1. Check Pre-requisites
   console.log('1. Checking pre-requisites...');
@@ -48,21 +48,21 @@ async function main() {
   if (!geminiKey) geminiKey = await question('Enter Gemini API Key: ');
 
   try {
-    execSync(`kubectl create secret generic nanoclaw-secrets \
+    execSync(`kubectl create secret generic nanogem-secrets \
       --from-literal=DISCORD_BOT_TOKEN="${discordToken}" \
       --from-literal=GEMINI_API_KEY="${geminiKey}" \
-      --namespace nanoclaw --dry-run=client -o yaml | kubectl apply -f -`, { stdio: 'inherit' });
+      --namespace nanogem --dry-run=client -o yaml | kubectl apply -f -`, { stdio: 'inherit' });
     console.log('  ✓ Kubernetes secrets updated');
   } catch (err) {
-    console.error('  ✗ Failed to create secrets. Ensure the "nanoclaw" namespace exists.');
-    console.log('  (Hint: kubectl create namespace nanoclaw)');
+    console.error('  ✗ Failed to create secrets. Ensure the "nanogem" namespace exists.');
+    console.log('  (Hint: kubectl create namespace nanogem)');
     process.exit(1);
   }
 
   // 3. Configure Storage
   console.log('\n3. Configuring Storage (PVC)...');
-  const pvcExample = 'nanoclaw-storage.example.yaml';
-  const pvcFinal = 'nanoclaw-storage-final.yaml';
+  const pvcExample = 'nanogem-storage.example.yaml';
+  const pvcFinal = 'nanogem-storage-final.yaml';
 
   if (!fs.existsSync(pvcFinal)) {
     console.log(`  Creating ${pvcFinal} from example...`);
@@ -84,6 +84,7 @@ async function main() {
 
   // 4. Configure Registry
   console.log('\n4. Configuring Image Registry...');
+  console.log('  NanoGem needs a registry to store and pull agent images.');
   const regFinal = 'registry.yaml';
   let registryUrl = 'localhost:5000';
 
@@ -91,7 +92,8 @@ async function main() {
     const reg = fs.readFileSync(regFinal, 'utf-8');
     registryUrl = reg.match(/url: (.*)/)?.[1] || registryUrl;
   } else {
-    registryUrl = await question(`Enter your container registry URL (default: ${registryUrl}): `) || registryUrl;
+    console.log('\n  Enter your registry address (e.g., 192.168.1.100:5000 or ghcr.io/username)');
+    registryUrl = await question(`  Registry URL [${registryUrl}]: `) || registryUrl;
     fs.writeFileSync(regFinal, `url: ${registryUrl}\n`);
   }
 
@@ -99,8 +101,8 @@ async function main() {
   console.log('\n5. Building and Pushing Images...');
   const build = await question('Build and push images to your registry now? (y/n): ');
   if (build.toLowerCase() === 'y') {
-    const orchestratorImage = `${registryUrl}/nanoclaw:latest`;
-    const agentImage = `${registryUrl}/nanoclaw-agent:latest`;
+    const orchestratorImage = `${registryUrl}/nanogem:latest`;
+    const agentImage = `${registryUrl}/nanogem-agent:latest`;
 
     console.log(`  Building ${orchestratorImage}...`);
     execSync(`docker build -t ${orchestratorImage} .`, { stdio: 'inherit' });
@@ -113,7 +115,7 @@ async function main() {
   }
 
   // 6. Deploy
-  console.log('\n6. Deploying NanoClaw...');
+  console.log('\n6. Deploying NanoGem...');
   const deployExample = 'deployment.example.yaml';
   const deployFinal = 'deployment.yaml';
 
@@ -127,10 +129,10 @@ async function main() {
   const applyDeploy = await question('Apply deployment now? (y/n): ');
   if (applyDeploy.toLowerCase() === 'y') {
     execSync(`kubectl apply -f ${deployFinal}`, { stdio: 'inherit' });
-    console.log('\n  ✓ NanoClaw deployed! Use "kubectl get pods -n nanoclaw" to check status.');
+    console.log('\n  ✓ NanoGem deployed! Use "kubectl get pods -n nanogem" to check status.');
   }
 
-  console.log('\nSetup complete! Welcome to NanoClaw.');
+  console.log('\nSetup complete! Welcome to NanoGem.');
   rl.close();
 }
 

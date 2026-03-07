@@ -5,7 +5,7 @@ import os from 'os';
 import path from 'path';
 
 import { clearBackup, createBackup, restoreBackup } from './backup.js';
-import { NANOCLAW_DIR } from './constants.js';
+import { NANOGEM_DIR } from './constants.js';
 import { copyDir } from './fs-utils.js';
 import { isCustomizeActive } from './customize.js';
 import { executeFileOps } from './file-ops.js';
@@ -96,7 +96,7 @@ export async function applySkill(skillDir: string): Promise<ApplyResult> {
   for (const relPath of manifest.modifies) {
     const resolvedPath = resolvePathRemap(relPath, pathRemap);
     const currentPath = path.join(projectRoot, resolvedPath);
-    const basePath = path.join(projectRoot, NANOCLAW_DIR, 'base', resolvedPath);
+    const basePath = path.join(projectRoot, NANOGEM_DIR, 'base', resolvedPath);
 
     if (fs.existsSync(currentPath) && fs.existsSync(basePath)) {
       const currentHash = computeFileHash(currentPath);
@@ -180,7 +180,7 @@ export async function applySkill(skillDir: string): Promise<ApplyResult> {
       const currentPath = path.join(projectRoot, resolvedPath);
       const basePath = path.join(
         projectRoot,
-        NANOCLAW_DIR,
+        NANOGEM_DIR,
         'base',
         resolvedPath,
       );

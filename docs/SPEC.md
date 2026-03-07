@@ -1,4 +1,4 @@
-# NanoClaw Specification
+# NanoGem Specification
 
 A personal Gemini assistant accessible via Discord, with persistent memory per conversation, scheduled tasks, and Kubernetes-based agent execution.
 
@@ -62,7 +62,7 @@ A personal Gemini assistant accessible via Discord, with persistent memory per c
 │  │    • Read, Write, Edit, Glob, Grep (file operations)           │   │
 │  │    • WebSearch, WebFetch (internet access)                     │   │
 │  │    • agent-browser (browser automation)                        │   │
-│  │    • mcp__nanoclaw__* (scheduler tools via IPC)                │   │
+│  │    • mcp__nanogem__* (scheduler tools via IPC)                │   │
 │  │                                                                │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 │                                                                      │
@@ -85,7 +85,7 @@ A personal Gemini assistant accessible via Discord, with persistent memory per c
 ## Folder Structure
 
 ```
-nanoclaw/
+nanogem/
 ├── GEMINI.md                      # Project context for Gemini CLI
 ├── docs/
 │   ├── SPEC.md                    # This specification document
@@ -140,18 +140,18 @@ nanoclaw/
 Configuration constants are in `src/config.ts`:
 
 ```typescript
-export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || 'NanoClaw';
+export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || 'NanoGem';
 export const POLL_INTERVAL = 2000;
 export const SCHEDULER_POLL_INTERVAL = 60000;
 
 // Container/Pod configuration
-export const CONTAINER_IMAGE = process.env.CONTAINER_IMAGE || 'nanoclaw-agent:latest';
+export const CONTAINER_IMAGE = process.env.CONTAINER_IMAGE || 'nanogem-agent:latest';
 export const CONTAINER_TIMEOUT = parseInt(process.env.CONTAINER_TIMEOUT || '1800000', 10);
 export const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 // Kubernetes specifics
 export const K8S_NAMESPACE = process.env.K8S_NAMESPACE || 'default';
-export const K8S_PVC_NAME = process.env.K8S_PVC_NAME || 'nanoclaw-pvc';
+export const K8S_PVC_NAME = process.env.K8S_PVC_NAME || 'nanogem-pvc';
 ```
 
 ---
@@ -213,11 +213,11 @@ All agents run inside isolated Kubernetes pods:
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| No response | Pod not running | Check `kubectl get pods -n nanoclaw` |
+| No response | Pod not running | Check `kubectl get pods -n nanogem` |
 | Agent failed | Cluster unreachable | Ensure Kubeconfig is valid and API is up |
 | "Unauthorized" | Group not registered | Register the channel from main |
 
 ### Log Location
 
-- `logs/nanoclaw.log` - Host stdout
-- `logs/nanoclaw.error.log` - Host stderr
+- `logs/nanogem.log` - Host stdout
+- `logs/nanogem.error.log` - Host stderr

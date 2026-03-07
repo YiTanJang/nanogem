@@ -1,12 +1,12 @@
 #!/bin/bash
-# Build the NanoClaw agent container image
+# Build the NanoGem agent container image
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-IMAGE_NAME="nanoclaw-agent"
+IMAGE_NAME="nanogem-agent"
 TAG="${1:-latest}"
 CONTAINER_RUNTIME="${CONTAINER_RUNTIME:-docker}"
 
@@ -17,7 +17,7 @@ if [ "$BUILD_RUNTIME" == "k8s" ]; then
     BUILD_RUNTIME="docker"
 fi
 
-echo "Building NanoClaw agent container image..."
+echo "Building NanoGem agent container image..."
 echo "Image: ${IMAGE_NAME}:${TAG}"
 
 ${BUILD_RUNTIME} build -t "${IMAGE_NAME}:${TAG}" .

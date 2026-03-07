@@ -1,5 +1,5 @@
 /**
- * Container Runner for NanoClaw
+ * Container Runner for NanoGem
  * Spawns agent execution in Kubernetes pods and handles IPC
  */
 import fs from 'fs';
@@ -34,8 +34,8 @@ function getK8sApi() {
 }
 
 // Sentinel markers for robust output parsing (must match agent-runner)
-const OUTPUT_START_MARKER = '---NANOCLAW_OUTPUT_START---';
-const OUTPUT_END_MARKER = '---NANOCLAW_OUTPUT_END---';
+const OUTPUT_START_MARKER = '---NANOGEM_OUTPUT_START---';
+const OUTPUT_END_MARKER = '---NANOGEM_OUTPUT_END---';
 
 export interface ContainerInput {
   prompt: string;
@@ -253,7 +253,7 @@ async function runAgentPod(
   projectRoot: string = process.cwd(),
 ): Promise<ContainerOutput> {
   const safeName = group.folder.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
-  const podName = `nanoclaw-agent-${safeName}-${Date.now()}`;
+  const podName = `nanogem-agent-${safeName}-${Date.now()}`;
 
   logger.info({ group: group.name, podName }, 'Creating agent pod');
 
@@ -266,9 +266,9 @@ async function runAgentPod(
     metadata: {
       name: podName,
       labels: {
-        app: 'nanoclaw-agent',
-        'app.kubernetes.io/managed-by': 'nanoclaw',
-        'nanoclaw.io/group': safeName,
+        app: 'nanogem-agent',
+        'app.kubernetes.io/managed-by': 'nanogem',
+        'nanogem.io/group': safeName,
       },
     },
     spec: {
@@ -283,13 +283,13 @@ async function runAgentPod(
               name: 'GEMINI_API_KEY',
               valueFrom: {
                 secretKeyRef: {
-                  name: 'nanoclaw-secrets',
+                  name: 'nanogem-secrets',
                   key: 'GEMINI_API_KEY',
                 },
               },
             },
             {
-              name: 'NANOCLAW_INPUT',
+              name: 'NANOGEM_INPUT',
               value: Buffer.from(JSON.stringify(input)).toString('base64'),
             },
             {
@@ -298,7 +298,7 @@ async function runAgentPod(
             },
           ],
           command: ['/bin/sh', '-c'],
-          args: ['echo "$NANOCLAW_INPUT" | /app/entrypoint.sh'],
+          args: ['echo "$NANOGEM_INPUT" | /app/entrypoint.sh'],
           volumeMounts: [
             ...mounts.map((m) => ({
               name: 'agent-storage',

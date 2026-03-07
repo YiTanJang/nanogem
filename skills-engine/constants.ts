@@ -1,10 +1,10 @@
-export const NANOCLAW_DIR = '.nanoclaw';
+export const NANOGEM_DIR = '.nanogem';
 export const STATE_FILE = 'state.yaml';
-export const BASE_DIR = '.nanoclaw/base';
-export const SKILLS_DIR = '.nanoclaw/skills';
-export const BACKUP_DIR = '.nanoclaw/backup';
-export const LOCK_FILE = '.nanoclaw/lock';
-export const CUSTOM_DIR = '.nanoclaw/custom';
+export const BASE_DIR = '.nanogem/base';
+export const SKILLS_DIR = '.nanogem/skills';
+export const BACKUP_DIR = '.nanogem/backup';
+export const LOCK_FILE = '.nanogem/lock';
+export const CUSTOM_DIR = '.nanogem/custom';
 export const SKILLS_SCHEMA_VERSION = '0.1.0';
 
 // Top-level paths to include in base snapshot and upstream extraction.

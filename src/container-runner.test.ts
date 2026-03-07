@@ -8,16 +8,16 @@ const OUTPUT_END_MARKER = '---NANOCLAW_OUTPUT_END---';
 
 // Mock config
 vi.mock('./config.js', () => ({
-  CONTAINER_IMAGE: 'nanoclaw-agent:latest',
+  CONTAINER_IMAGE: 'nanogem-agent:latest',
   CONTAINER_MAX_OUTPUT_SIZE: 10485760,
   CONTAINER_TIMEOUT: 1800000, // 30min
-  DATA_DIR: '/tmp/nanoclaw-test-data',
-  GROUPS_DIR: '/tmp/nanoclaw-test-groups',
+  DATA_DIR: '/tmp/nanogem-test-data',
+  GROUPS_DIR: '/tmp/nanogem-test-groups',
   IDLE_TIMEOUT: 1800000, // 30min
   TIMEZONE: 'America/Los_Angeles',
   GEMINI_MODEL: 'gemini-2.5-flash-lite',
   K8S_NAMESPACE: 'default',
-  K8S_PVC_NAME: 'nanoclaw-pvc',
+  K8S_PVC_NAME: 'nanogem-pvc',
   K8S_PVC_SUBPATH: 'memory',
 }));
 
