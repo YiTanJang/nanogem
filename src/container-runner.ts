@@ -447,7 +447,33 @@ async function runAgentPod(
       const startTime = Date.now();
       const MAX_POD_LIFE = 1800000;
 
-      while (podStatus === 'Pending' || podStatus === 'Running') {
+      // Real-time Watcher: Listen for pod lifecycle events directly from K8s API
+      const watch = new k8s.Watch(kc);
+      let watchRequest: any;
+      let _resolvePod: () => void;
+
+      const watchPromise = new Promise<void>((resolve) => {
+        _resolvePod = resolve;
+        watch.watch(
+          `/api/v1/namespaces/${K8S_NAMESPACE}/pods`,
+          { fieldSelector: `metadata.name=${podName}` },
+          (type, obj) => {
+            const status = obj.status?.phase;
+            if (status === 'Succeeded' || status === 'Failed') {
+              logger.debug({ podName, status }, 'Pod watch detected completion');
+              if (watchRequest) watchRequest.abort();
+              _resolvePod();
+            }
+          },
+          (err) => {
+            if (err) logger.debug({ err, podName }, 'Pod watch ended');
+            _resolvePod();
+          }
+        ).then(req => { watchRequest = req; });
+      });
+
+      // Backup: Still check for results in IPC directory periodically
+      const backupInterval = setInterval(() => {
         if (fs.existsSync(groupIpcDir)) {
           const files = fs.readdirSync(groupIpcDir)
             .filter(f => f.startsWith('result-') && f.endsWith('.json'))
@@ -469,22 +495,14 @@ async function runAgentPod(
 
         if (Date.now() - startTime > MAX_POD_LIFE) {
           logger.warn({ podName }, 'Pod reached max life, killing');
-          await k8sRuntime.stopPod(podName);
-          break;
+          if (watchRequest) watchRequest.abort();
+          k8sRuntime.stopPod(podName);
+          _resolvePod();
         }
+      }, 5000);
 
-        try {
-          const res = await getK8sApi().readNamespacedPodStatus({
-            name: podName,
-            namespace: K8S_NAMESPACE,
-          });
-          podStatus = res.status?.phase || 'Unknown';
-        } catch (err) {
-          logger.warn({ err, podName }, 'Failed to read pod status');
-        }
-        if (podStatus === 'Succeeded' || podStatus === 'Failed') break;
-        await new Promise((r) => setTimeout(r, 5000));
-      }
+      await watchPromise;
+      clearInterval(backupInterval);
 
       if (!firstOutputResolved) {
         try {
