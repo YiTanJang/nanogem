@@ -30,3 +30,4 @@ Thumbs.db
 nanoclaw-agent.tar
 deployment.yaml
 nanoclaw-storage-final.yaml
+.mcp.json

@@ -1,0 +1,43 @@
+<svg width="800" height="800" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gemGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4facfe;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00f2fe;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="10" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Outer Glow -->
+  <path d="M400 100 L660 250 L660 550 L400 700 L140 550 L140 250 Z" 
+        fill="none" stroke="url(#gemGradient)" stroke-width="2" opacity="0.3" filter="url(#glow)"/>
+
+  <!-- Main Gem Body (Hexagon) -->
+  <path d="M400 150 L615 275 L615 525 L400 650 L185 525 L185 275 Z" 
+        fill="#0a0e17" stroke="url(#gemGradient)" stroke-width="8"/>
+  
+  <!-- Gem Facets (Refractions) -->
+  <path d="M400 150 L400 650" stroke="url(#gemGradient)" stroke-width="2" opacity="0.5"/>
+  <path d="M185 275 L615 525" stroke="url(#gemGradient)" stroke-width="2" opacity="0.5"/>
+  <path d="M615 275 L185 525" stroke="url(#gemGradient)" stroke-width="2" opacity="0.5"/>
+  
+  <!-- Nano Circuit Accents -->
+  <circle cx="400" cy="400" r="60" fill="none" stroke="url(#gemGradient)" stroke-width="4" filter="url(#glow)"/>
+  <path d="M400 340 L400 200" stroke="url(#gemGradient)" stroke-width="4" stroke-linecap="round"/>
+  <path d="M460 400 L600 400" stroke="url(#gemGradient)" stroke-width="4" stroke-linecap="round"/>
+  <path d="M340 400 L200 400" stroke="url(#gemGradient)" stroke-width="4" stroke-linecap="round"/>
+  <path d="M400 460 L400 600" stroke="url(#gemGradient)" stroke-width="4" stroke-linecap="round"/>
+  
+  <circle cx="400" cy="200" r="10" fill="url(#gemGradient)"/>
+  <circle cx="600" cy="400" r="10" fill="url(#gemGradient)"/>
+  <circle cx="200" cy="400" r="10" fill="url(#gemGradient)"/>
+  <circle cx="400" cy="600" r="10" fill="url(#gemGradient)"/>
+
+  <!-- Brand Text -->
+  <text x="400" y="760" font-family="Arial, sans-serif" font-size="60" font-weight="bold" fill="white" text-anchor="middle" letter-spacing="10">NANOGEM</text>
+</svg>

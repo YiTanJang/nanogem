@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/nanoclaw-logo.png" alt="NanoGem" width="400">
+  <img src="assets/nanogem-logo.svg" alt="NanoGem" width="400">
 </p>
 
 <p align="center">
