@@ -94,6 +94,7 @@ export function recallMemory(category: 'facts' | 'workflows' | 'episodes'): stri
  */
 export function recordEpisode(prompt: string, result: string): void {
   try {
+    // 1. Save to Episodic Memory directory
     fs.mkdirSync(EPISODES_DIR, { recursive: true });
     const episodeFile = `episode-${Date.now()}.md`;
     const episodeContent = `## Mission Report: ${new Date().toISOString()}
@@ -102,6 +103,12 @@ export function recordEpisode(prompt: string, result: string): void {
 **Status**: COMPLETED`;
     
     fs.writeFileSync(path.join(EPISODES_DIR, episodeFile), episodeContent);
+
+    // 2. Backup to THOUGHTS.log in the group workspace for human readability
+    try {
+      const thoughtPath = path.join('/workspace/group', 'THOUGHTS.log');
+      fs.appendFileSync(thoughtPath, `\n[${new Date().toISOString()}] [AGENT_RESPONSE]\n${result}\n`);
+    } catch (err) {}
   } catch (e) {
     console.error(`[agent-runner] Failed to record episodic memory: ${e}`);
   }
