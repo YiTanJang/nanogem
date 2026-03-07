@@ -1,4 +1,3 @@
-import { ChildProcess } from 'child_process';
 import { CronExpressionParser } from 'cron-parser';
 import fs from 'fs';
 
@@ -35,7 +34,7 @@ export interface SchedulerDependencies {
   queue: GroupQueue;
   onProcess: (
     groupJid: string,
-    proc: ChildProcess,
+    proc: any, // Kubernetes pod dummy process
     containerName: string,
     groupFolder: string,
   ) => void;
@@ -166,7 +165,7 @@ Task: ${prompt}`;
   const scheduleClose = () => {
     if (closeTimer) return; // already scheduled
     closeTimer = setTimeout(() => {
-      logger.debug({ taskId: task.id }, 'Closing task container after result');
+      logger.debug({ taskId: task.id }, 'Closing task pod after result');
       deps.queue.closeStdin(task.chat_jid);
     }, TASK_CLOSE_DELAY_MS);
   };
@@ -184,8 +183,8 @@ Task: ${prompt}`;
         assistantName: ASSISTANT_NAME,
         model,
       },
-      (proc, containerName) =>
-        deps.onProcess(task.chat_jid, proc, containerName, task.group_folder),
+      (proc, podName) =>
+        deps.onProcess(task.chat_jid, proc, podName, task.group_folder),
       async (streamedOutput: ContainerOutput) => {
         if (streamedOutput.result) {
           result = streamedOutput.result;
@@ -254,25 +253,18 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
   const loop = async () => {
     if (!schedulerRunning) return;
     try {
-      const now = new Date().toISOString();
       const dueTasks = getDueTasks();
-
-      // Reload registered groups from DB
-      const registeredGroups = deps.registeredGroups();
 
       if (dueTasks.length > 0) {
         logger.info({ count: dueTasks.length }, 'Found due tasks');
       }
 
       for (const task of dueTasks) {
-        // Re-check task status in case it was paused/cancelled
         const currentTask = getTaskById(task.id);
         if (!currentTask || currentTask.status !== 'active') {
           continue;
         }
 
-        // Advance next_run IMMEDIATELY upon enqueuing so the next loop
-        // doesn't pick it up again while it's still waiting in the queue.
         const nextRun = calculateNextRun(currentTask);
         updateTask(currentTask.id, { next_run: nextRun });
 
@@ -297,7 +289,6 @@ export function recoverQueuedTasks(deps: SchedulerDependencies): void {
     for (const queued of queuedTasks) {
       const task = getTaskById(queued.task_id);
       if (task) {
-        // Advance next_run immediately for recovered tasks too
         const nextRun = calculateNextRun(task);
         updateTask(task.id, { next_run: nextRun });
 
@@ -309,7 +300,6 @@ export function recoverQueuedTasks(deps: SchedulerDependencies): void {
           { taskId: queued.task_id },
           'Queued task not found in database, skipping recovery',
         );
-        // Clean up the orphaned queued task
         removeQueuedTask(queued.task_id);
       }
     }

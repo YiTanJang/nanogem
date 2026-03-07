@@ -18,10 +18,6 @@ import {
   writeTasksSnapshot,
 } from './container-runner.js';
 import {
-  cleanupOrphans,
-  ensureContainerRuntimeRunning,
-} from './container-runtime.js';
-import {
   getAllChats,
   getAllRegisteredGroups,
   getAllSessions,
@@ -273,7 +269,7 @@ export async function runAgent(
       prompt, sessionId, groupFolder: group.folder, chatJid, isMain,
       assistantName: ASSISTANT_NAME, model, mcpConfig: getMcpConfig(),
     }, 
-    (proc, containerName) => queue.registerProcess(chatJid, proc, containerName, group.folder),
+    (proc, podName) => queue.registerProcess(chatJid, proc, podName, group.folder),
     wrappedOnOutput);
 
     return output.status === 'success' ? 'success' : 'error';
@@ -318,8 +314,8 @@ export function _setRegisteredGroups(
 
 async function main(): Promise<void> {
   console.log("--- KANIKO_EVOLUTION_SUCCESS ---");
-  await ensureContainerRuntimeRunning();
-  await cleanupOrphans();
+  await k8sRuntime.ensureK8sReady();
+  await k8sRuntime.cleanupOrphans();
   initDatabase();
   loadState();
 

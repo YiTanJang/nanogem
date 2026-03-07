@@ -22,7 +22,6 @@
     "better-sqlite3": "^11.8.1",
     "cron-parser": "^5.5.0",
     "discord.js": "^14.25.1",
-    "dockerode": "^4.0.9",
     "eventsource": "^4.1.0",
     "grammy": "^1.41.0",
     "pino": "^9.6.0",

@@ -24,63 +24,51 @@ kubectl logs deployment/nanoclaw -n nanoclaw --tail=100 | grep 'groupCount'
 ```bash
 # Check for session history in .gemini/ directory
 ls -la data/sessions/<group>/.gemini/
-
-# Check for session history file
-ls -la groups/<group>/.nanoclaw/history.json
 ```
 
-## Container/Pod Timeout Investigation
+## Pod Timeout Investigation
 
 ```bash
 # Check for recent timeouts
-grep -E 'Container timeout|timed out|Pod reached max life' logs/nanoclaw.log | tail -10
-
-# Check container log files for the timed-out container
-ls -lt groups/*/logs/container-*.log | head -10
-
-# Read the most recent container log (replace path)
-cat groups/<group>/logs/container-<timestamp>.log
+kubectl logs deployment/nanoclaw -n nanoclaw --tail=500 | grep -E 'Pod reached max life|timed out'
 
 # Check if retries were scheduled and what happened
-grep -E 'Scheduling retry|retry|Max retries' logs/nanoclaw.log | tail -10
+kubectl logs deployment/nanoclaw -n nanoclaw --tail=500 | grep -E 'Scheduling retry|retry|Max retries'
 ```
 
 ## Agent Not Responding
 
 ```bash
 # Check if messages are being received from Discord
-grep 'Raw Discord message received' logs/nanoclaw.log | tail -10
+kubectl logs deployment/nanoclaw -n nanoclaw --tail=100 | grep 'Raw Discord message received'
 
 # Check if a bot message (mention/DM) was recognized
-grep 'Discord bot message received' logs/nanoclaw.log | tail -10
+kubectl logs deployment/nanoclaw -n nanoclaw --tail=100 | grep 'Discord bot message received'
 
-# Check if messages are being processed (container spawned)
-grep -E 'Processing messages|Creating agent pod' logs/nanoclaw.log | tail -10
+# Check if messages are being processed (pod created)
+kubectl logs deployment/nanoclaw -n nanoclaw --tail=100 | grep -E 'Processing messages|Creating agent pod'
 
-# Check if messages are being piped to active container
-grep -E 'Piped message|sendMessage' logs/nanoclaw.log | tail -10
+# Check if messages are being piped to active pod
+kubectl logs deployment/nanoclaw -n nanoclaw --tail=100 | grep -E 'Piped message|sendMessage'
 
-# Check the queue state — any active containers?
-grep -E 'Starting container|Container active|concurrency limit' logs/nanoclaw.log | tail -10
+# Check the queue state
+kubectl logs deployment/nanoclaw -n nanoclaw --tail=100 | grep -E 'Starting pod|Pod active'
 
 # Check lastAgentTimestamp vs latest message timestamp
 sqlite3 store/messages.db "SELECT chat_jid, MAX(timestamp) as latest FROM messages GROUP BY chat_jid ORDER BY latest DESC LIMIT 5;"
 ```
 
-## Container/Pod Mount Issues
+## Pod Mount Issues
 
 ```bash
-# Check mount validation logs (shows on container spawn)
-grep -E 'Mount validated|Mount.*REJECTED|mount' logs/nanoclaw.log | tail -10
+# Check mount validation logs (shows on pod creation)
+kubectl logs deployment/nanoclaw -n nanoclaw --tail=100 | grep -E 'Mount validated|Mount.*REJECTED|mount'
 
 # Verify the mount allowlist is readable
 cat ~/.config/nanoclaw/mount-allowlist.json
 
 # Check group's container_config in DB
 sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;"
-
-# Test-run a container to check mounts (dry run)
-docker run -i --rm --entrypoint ls nanoclaw-agent:latest /workspace/extra/
 ```
 
 ## Discord Auth Issues
@@ -90,7 +78,7 @@ docker run -i --rm --entrypoint ls nanoclaw-agent:latest /workspace/extra/
 grep 'DISCORD_BOT_TOKEN' .env
 
 # Check for connection errors
-grep -i 'failed to connect to discord' logs/nanoclaw.log | tail -5
+kubectl logs deployment/nanoclaw -n nanoclaw --tail=100 | grep -i 'failed to connect to discord'
 ```
 
 ## Service Management

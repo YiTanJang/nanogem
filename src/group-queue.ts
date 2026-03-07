@@ -1,8 +1,7 @@
-import { ChildProcess } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
-import { DATA_DIR, MAX_CONCURRENT_CONTAINERS, TRIGGER_PATTERN } from './config.js';
+import { DATA_DIR, TRIGGER_PATTERN } from './config.js';
 import { addQueuedTask, removeQueuedTask } from './db.js';
 import { logger } from './logger.js';
 import { RegisteredGroup } from './types.js';
@@ -22,7 +21,7 @@ interface GroupState {
   isTaskContainer: boolean;
   pendingMessages: boolean;
   pendingTasks: QueuedTask[];
-  process: ChildProcess | null;
+  process: any | null; // Kubernetes pod dummy process
   containerName: string | null;
   groupFolder: string | null;
   retryCount: number;
@@ -30,8 +29,6 @@ interface GroupState {
 
 export class GroupQueue {
   private groups = new Map<string, GroupState>();
-  private activeCount = 0;
-  private waitingGroups: string[] = [];
   private processMessagesFn: ((groupJid: string) => Promise<boolean>) | null =
     null;
   private shuttingDown = false;
@@ -71,27 +68,10 @@ export class GroupQueue {
 
     if (state.active) {
       state.pendingMessages = true;
-      logger.debug({ groupJid }, 'Container active, message queued');
+      logger.debug({ groupJid }, 'Pod active, message queued');
       return;
     }
 
-    if (this.waitingGroups.includes(groupJid)) {
-      state.pendingMessages = true;
-      logger.debug({ groupJid }, 'Group already waiting, message queued');
-      return;
-    }
-
-    if (this.activeCount >= MAX_CONCURRENT_CONTAINERS) {
-      state.pendingMessages = true;
-      this.waitingGroups.push(groupJid);
-      logger.debug(
-        { groupJid, activeCount: this.activeCount },
-        'At concurrency limit, message queued',
-      );
-      return;
-    }
-
-    this.activeCount++;
     this.runForGroup(groupJid, 'messages').catch((err) =>
       logger.error({ groupJid, err }, 'Unhandled error in runForGroup'),
     );
@@ -100,12 +80,10 @@ export class GroupQueue {
   enqueueTask(groupJid: string, taskId: string, fn: () => Promise<void>): void {
     if (this.shuttingDown) return;
 
-    // Persist the task to the DB in case of a crash
     addQueuedTask(taskId, groupJid);
 
     const state = this.getGroup(groupJid);
 
-    // Prevent double-queuing of the same task
     if (state.pendingTasks.some((t) => t.id === taskId)) {
       logger.debug({ groupJid, taskId }, 'Task already queued, skipping');
       return;
@@ -116,24 +94,11 @@ export class GroupQueue {
       if (state.idleWaiting) {
         this.closeStdin(groupJid);
       }
-      logger.debug({ groupJid, taskId }, 'Container active, task queued');
+      logger.debug({ groupJid, taskId }, 'Pod active, task queued');
       return;
     }
 
-    if (this.activeCount >= MAX_CONCURRENT_CONTAINERS) {
-      state.pendingTasks.push({ id: taskId, groupJid, fn });
-      if (!this.waitingGroups.includes(groupJid)) {
-        this.waitingGroups.push(groupJid);
-      }
-      logger.debug(
-        { groupJid, taskId, activeCount: this.activeCount },
-        'At concurrency limit, task queued',
-      );
-      return;
-    }
-
-    // Run immediately
-    this.activeCount++;
+    // Run immediately (Kubernetes handles concurrency)
     this.runTask(groupJid, { id: taskId, groupJid, fn }).catch((err) =>
       logger.error({ groupJid, taskId, err }, 'Unhandled error in runTask'),
     );
@@ -141,7 +106,7 @@ export class GroupQueue {
 
   registerProcess(
     groupJid: string,
-    proc: ChildProcess,
+    proc: any,
     containerName: string,
     groupFolder?: string,
   ): void {
@@ -151,10 +116,6 @@ export class GroupQueue {
     if (groupFolder) state.groupFolder = groupFolder;
   }
 
-  /**
-   * Mark the container as idle-waiting (finished work, waiting for IPC input).
-   * If tasks are pending, preempt the idle container immediately.
-   */
   notifyIdle(groupJid: string): void {
     const state = this.getGroup(groupJid);
     state.idleWaiting = true;
@@ -163,16 +124,11 @@ export class GroupQueue {
     }
   }
 
-  /**
-   * Send a follow-up message to the active container via IPC file.
-   * Returns true if the message was written, false if no active container.
-   */
   sendMessage(groupJid: string, text: string, isBotMessage: boolean = false): boolean {
     const state = this.getGroup(groupJid);
     if (!state.active || !state.groupFolder || state.isTaskContainer)
       return false;
 
-    // Trigger enforcement for follow-up piping
     const group = this.registeredGroups[groupJid];
     if (group) {
       const isMainGroup = group.folder === 'main';
@@ -180,10 +136,8 @@ export class GroupQueue {
       const needsTrigger = group.requiresTrigger ?? (!isMainGroup && !isInternal);
 
       if (needsTrigger) {
-        // Standardize trigger check logic (matches src/index.ts)
         const isDiscord = groupJid.startsWith('discord-');
         const isInternalTarget = groupJid.startsWith('internal-');
-        
         const hasTriggerPattern = (isDiscord || isInternalTarget) && TRIGGER_PATTERN.test(text);
         
         if (!isBotMessage && !hasTriggerPattern) {
@@ -193,7 +147,7 @@ export class GroupQueue {
       }
     }
 
-    state.idleWaiting = false; // Agent is about to receive work, no longer idle
+    state.idleWaiting = false;
 
     const inputDir = path.join(DATA_DIR, 'ipc', state.groupFolder, 'input');
     try {
@@ -209,9 +163,6 @@ export class GroupQueue {
     }
   }
 
-  /**
-   * Signal the active container to wind down by writing a close sentinel.
-   */
   closeStdin(groupJid: string): void {
     const state = this.getGroup(groupJid);
     if (!state.active || !state.groupFolder) return;
@@ -236,8 +187,8 @@ export class GroupQueue {
     state.pendingMessages = false;
 
     logger.debug(
-      { groupJid, reason, activeCount: this.activeCount },
-      'Starting container for group',
+      { groupJid, reason },
+      'Starting pod for group',
     );
 
     try {
@@ -246,23 +197,16 @@ export class GroupQueue {
         if (success) {
           state.retryCount = 0;
         } else {
-          // If the container failed to even start or provide first output, we don't keep it
           this.scheduleRetry(groupJid, state);
           return;
         }
       }
       
-      // If we reach here, the container is now in its idle loop (wait_for_followup)
-      // We keep it ACTIVE so that sendMessage() will pipe to it.
-      // It will eventually exit via idle timeout (10m) or if we close its stdin.
-      
-      // Wait for the background process to actually exit
       if (state.process) {
         await new Promise<void>((resolve) => {
           state.process?.on('exit', () => resolve());
-          // Safety: check every few seconds if process object is still there
           const timer = setInterval(() => {
-            if (!state.process || state.process.killed) {
+            if (!state.process) {
               clearInterval(timer);
               resolve();
             }
@@ -280,7 +224,6 @@ export class GroupQueue {
       state.process = null;
       state.containerName = null;
       state.groupFolder = null;
-      this.activeCount--;
       this.drainGroup(groupJid);
     }
   }
@@ -292,7 +235,7 @@ export class GroupQueue {
     state.isTaskContainer = true;
 
     logger.debug(
-      { groupJid, taskId: task.id, activeCount: this.activeCount },
+      { groupJid, taskId: task.id },
       'Running queued task',
     );
 
@@ -307,7 +250,6 @@ export class GroupQueue {
       state.process = null;
       state.containerName = null;
       state.groupFolder = null;
-      this.activeCount--;
       this.drainGroup(groupJid);
     }
   }
@@ -317,7 +259,7 @@ export class GroupQueue {
     if (state.retryCount > MAX_RETRIES) {
       logger.error(
         { groupJid, retryCount: state.retryCount },
-        'Max retries exceeded, dropping messages (will retry on next incoming message)',
+        'Max retries exceeded, dropping messages',
       );
       state.retryCount = 0;
       return;
@@ -340,7 +282,6 @@ export class GroupQueue {
 
     const state = this.getGroup(groupJid);
 
-    // Tasks first (they won't be re-discovered from SQLite like messages)
     if (state.pendingTasks.length > 0) {
       const task = state.pendingTasks.shift()!;
       this.runTask(groupJid, task).catch((err) =>
@@ -352,7 +293,6 @@ export class GroupQueue {
       return;
     }
 
-    // Then pending messages
     if (state.pendingMessages) {
       this.runForGroup(groupJid, 'drain').catch((err) =>
         logger.error(
@@ -362,65 +302,21 @@ export class GroupQueue {
       );
       return;
     }
-
-    // Nothing pending for this group; check if other groups are waiting for a slot
-    this.drainWaiting();
-  }
-
-  private drainWaiting(): void {
-    while (
-      this.waitingGroups.length > 0 &&
-      this.activeCount < MAX_CONCURRENT_CONTAINERS
-    ) {
-      const nextJid = this.waitingGroups.shift()!;
-      const state = this.getGroup(nextJid);
-
-      // A group might be in the waiting list but have had its pending tasks
-      // cleared by another process.
-      if (!state.pendingTasks.length && !state.pendingMessages) {
-        continue;
-      }
-
-      this.activeCount++;
-
-      // Prioritize tasks over messages
-      if (state.pendingTasks.length > 0) {
-        const task = state.pendingTasks.shift()!;
-        this.runTask(nextJid, task).catch((err) =>
-          logger.error(
-            { groupJid: nextJid, taskId: task.id, err },
-            'Unhandled error in runTask (waiting)',
-          ),
-        );
-      } else if (state.pendingMessages) {
-        this.runForGroup(nextJid, 'drain').catch((err) =>
-          logger.error(
-            { groupJid: nextJid, err },
-            'Unhandled error in runForGroup (waiting)',
-          ),
-        );
-      } else {
-        // Should not happen due to check above, but for safety:
-        this.activeCount--;
-      }
-    }
   }
 
   async shutdown(_gracePeriodMs: number): Promise<void> {
     this.shuttingDown = true;
 
-    // Count active containers but don't kill them — they'll finish on their own
-    // via idle timeout or container timeout. The --rm flag cleans them up on exit.
-    const activeContainers: string[] = [];
+    const activePods: string[] = [];
     for (const [jid, state] of this.groups) {
-      if (state.process && !state.process.killed && state.containerName) {
-        activeContainers.push(state.containerName);
+      if (state.process && state.containerName) {
+        activePods.push(state.containerName);
       }
     }
 
     logger.info(
-      { activeCount: this.activeCount, detachedContainers: activeContainers },
-      'GroupQueue shutting down (containers detached, not killed)',
+      { detachedPods: activePods },
+      'GroupQueue shutting down (pods detached, not killed)',
     );
   }
 }
