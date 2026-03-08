@@ -27,7 +27,7 @@ export const Tools = {
     schema: z.object({
       command: z.string().describe('The command to execute'),
     }),
-    fn: (args: any) => {
+    fn: (args: any, _context: any) => {
       try {
         const output = execSync(args.command, { encoding: 'utf-8', timeout: 30000 });
         return output || 'Success (no output).';
@@ -41,7 +41,7 @@ export const Tools = {
     schema: z.object({
       path: z.string().describe('Path relative to /workspace/group'),
     }),
-    fn: (args: any) => {
+    fn: (args: any, _context: any) => {
       try {
         const fullPath = path.isAbsolute(args.path) ? args.path : path.resolve('/workspace/group', args.path);
         if (!fullPath.startsWith('/workspace/group') && !fullPath.startsWith('/workspace/project'))
@@ -58,7 +58,7 @@ export const Tools = {
       path: z.string().describe('Path relative to /workspace/group'),
       content: z.string().describe('Content to write'),
     }),
-    fn: (args: any) => {
+    fn: (args: any, _context: any) => {
       try {
         const fullPath = path.isAbsolute(args.path) ? args.path : path.resolve('/workspace/group', args.path);
         if (!fullPath.startsWith('/workspace/group') && !fullPath.startsWith('/workspace/project'))
@@ -78,7 +78,7 @@ export const Tools = {
       oldText: z.string().describe('The exact text to replace'),
       newText: z.string().describe('The replacement text'),
     }),
-    fn: (args: any) => {
+    fn: (args: any, _context: any) => {
       try {
         const fullPath = path.isAbsolute(args.path) ? args.path : path.resolve('/workspace/group', args.path);
         if (!fullPath.startsWith('/workspace/group') && !fullPath.startsWith('/workspace/project'))
@@ -177,7 +177,7 @@ export const Tools = {
     schema: z.object({
       category: z.enum(['facts', 'workflows', 'episodes']).describe('Memory category'),
     }),
-    fn: (args: any) => recallMemory(args.category)
+    fn: (args: any, _context: any) => recallMemory(args.category)
   },
   update_memory: {
     description: 'Update your long-term memory (Continuum).',
@@ -185,7 +185,7 @@ export const Tools = {
       category: z.enum(['facts', 'workflows']).describe('Type of memory to update'),
       content: z.string().describe('The updated Markdown content'),
     }),
-    fn: (args: any) => updateMemory(args.category, args.content)
+    fn: (args: any, _context: any) => updateMemory(args.category, args.content)
   },
   schedule_task: {
     description: 'Schedule a recurring or one-time AI task.',
@@ -211,7 +211,7 @@ export const Tools = {
     schema: z.object({
       id: z.string().describe('The task ID to pause'),
     }),
-    fn: (args: any) => {
+    fn: (args: any, _context: any) => {
       writeIpcFile(TASKS_DIR, { type: 'pause_task', ...args, timestamp: new Date().toISOString() });
       return 'Task pause requested.';
     }
@@ -221,7 +221,7 @@ export const Tools = {
     schema: z.object({
       id: z.string().describe('The task ID to resume'),
     }),
-    fn: (args: any) => {
+    fn: (args: any, _context: any) => {
       writeIpcFile(TASKS_DIR, { type: 'resume_task', ...args, timestamp: new Date().toISOString() });
       return 'Task resume requested.';
     }
@@ -231,7 +231,7 @@ export const Tools = {
     schema: z.object({
       id: z.string().describe('The task ID to cancel'),
     }),
-    fn: (args: any) => {
+    fn: (args: any, _context: any) => {
       writeIpcFile(TASKS_DIR, { type: 'cancel_task', ...args, timestamp: new Date().toISOString() });
       return 'Task cancellation requested.';
     }
@@ -239,7 +239,7 @@ export const Tools = {
   refresh_groups: {
     description: 'Sync available groups and write metadata snapshot.',
     schema: z.object({}),
-    fn: () => {
+    fn: (_args: any, _context: any) => {
       writeIpcFile(TASKS_DIR, { type: 'refresh_groups', timestamp: new Date().toISOString() });
       return 'Group refresh requested.';
     }
@@ -269,7 +269,7 @@ export const Tools = {
       imageTag: z.string().optional().describe('Optional custom image tag'),
       resumptionPrompt: z.string().optional().describe('Prompt to run after restart'),
     }),
-    fn: (args: any) => {
+    fn: (args: any, _context: any) => {
       writeIpcFile(TASKS_DIR, { type: 'rebuild_self', ...args, timestamp: new Date().toISOString() });
       return 'Rebuild requested.';
     }
@@ -330,7 +330,7 @@ export const Tools = {
   list_groups: {
     description: 'List all registered and available agent groups.',
     schema: z.object({}),
-    fn: () => {
+    fn: (_args: any, _context: any) => {
       const groupsFile = '/workspace/ipc/available_groups.json';
       return fs.existsSync(groupsFile) ? fs.readFileSync(groupsFile, 'utf-8') : 'Group list not available.';
     }
@@ -340,7 +340,7 @@ export const Tools = {
     schema: z.object({
       text: z.string().describe('The thought content to record'),
     }),
-    fn: (args: any) => {
+    fn: (args: any, _context: any) => {
       const logPath = '/workspace/group/THOUGHTS.log';
       const timestamp = new Date().toISOString();
       try {
@@ -357,7 +357,7 @@ export const Tools = {
       folder: z.string().describe('Sub-agent folder name'),
       timeoutMs: z.number().optional().default(300000),
     }),
-    fn: async (args: any) => {
+    fn: async (args: any, _context: any) => {
       const reportPath = path.join('/workspace/project/groups', args.folder, 'REPORT.md');
       const start = Date.now();
       while (Date.now() - start < args.timeoutMs) {
@@ -375,7 +375,7 @@ export const Tools = {
       folder: z.string().describe('Sub-agent folder name'),
       lines: z.number().optional().default(10),
     }),
-    fn: (args: any) => {
+    fn: (args: any, _context: any) => {
       const logPath = path.join('/workspace/project/groups', args.folder, 'THOUGHTS.log');
       try {
         if (!fs.existsSync(logPath)) return 'Log file not found.';
@@ -394,17 +394,12 @@ export const Tools = {
  */
 export function getToolDeclarations(): any[] {
   return Object.entries(Tools).map(([name, tool]) => {
-    // Generate a schema that is guaranteed to be compatible with Gemini/OpenAI
-    const jsonSchema = zodToJsonSchema(tool.schema as any, { 
-      target: 'openApi3',
-      $refStrategy: 'none' // Flatten the schema, no internal references
-    }) as any;
-    
+    const jsonSchema = zodToJsonSchema(tool.schema as any) as any;
     return {
       name,
       description: tool.description,
       parameters: {
-        type: 'object',
+        type: 'OBJECT',
         properties: jsonSchema.properties || {},
         required: jsonSchema.required || [],
       }
@@ -424,7 +419,8 @@ export function getFunctions(
   const functions: any = {};
   
   for (const [name, tool] of Object.entries(Tools)) {
-    functions[name] = (args: any) => tool.fn(args, context);
+    // Standardize: always call with (args, context)
+    functions[name] = (args: any) => (tool.fn as any)(args, context);
   }
   
   return functions;
