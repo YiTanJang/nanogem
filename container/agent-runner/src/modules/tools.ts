@@ -298,9 +298,9 @@ export const Tools = {
     }
   },
   delete_group: {
-    description: 'Delete an existing agent group workspace.',
+    description: 'Delete an internal agent group. Rule: JID must NOT start with "discord-".',
     schema: z.object({
-      jid: z.string().describe('The JID of the group to delete'),
+      jid: z.string().describe('The internal JID to delete'),
     }),
     fn: (args: any, context: any) => {
       writeIpcFile(TASKS_DIR, { 
@@ -313,9 +313,9 @@ export const Tools = {
     }
   },
   delete_discord_thread: {
-    description: 'Deletes an autonomous sub-agent and its associated Discord thread.',
+    description: 'Delete a Discord thread and sub-agent. Rule: JID must start with "discord-".',
     schema: z.object({
-      jid: z.string().describe('The JID of the thread to delete'),
+      jid: z.string().describe('The Discord thread JID to delete'),
     }),
     fn: (args: any, context: any) => {
       writeIpcFile(TASKS_DIR, { 
