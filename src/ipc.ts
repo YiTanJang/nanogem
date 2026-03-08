@@ -438,6 +438,14 @@ export async function processTaskIpc(
         break;
       }
       if (data.jid) {
+        // Safety: Prevent delete_group from being used on Discord threads
+        if (data.jid.startsWith('discord-')) {
+          const feedbackJid = data.chatJid || sourceGroup;
+          await deps.sendMessage(feedbackJid, `Error: '${data.jid}' is a Discord thread. You MUST use 'delete_discord_thread' to clean it up correctly.`);
+          logger.warn({ jid: data.jid, sourceGroup }, 'Rejected delete_group for Discord JID');
+          break;
+        }
+
         logger.info({ jid: data.jid }, 'Deleting group via IPC');
         deps.deleteGroup(data.jid);
 
@@ -463,6 +471,14 @@ export async function processTaskIpc(
     case 'delete_discord_thread':
       if (isMain) {
         if (data.jid) {
+          // Safety: ensure this is actually a Discord thread JID
+          if (!data.jid.startsWith('discord-')) {
+            const feedbackJid = data.chatJid || sourceGroup;
+            await deps.sendMessage(feedbackJid, `Error: '${data.jid}' is NOT a Discord thread. Use 'delete_group' for internal agents.`);
+            logger.warn({ jid: data.jid, sourceGroup }, 'Rejected delete_discord_thread for non-Discord JID');
+            break;
+          }
+
           logger.info({ jid: data.jid }, 'Deleting sub-agent and Discord thread via IPC');
           // 1. Delete the logical agent and its files
           deps.deleteGroup(data.jid);
