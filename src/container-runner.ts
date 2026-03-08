@@ -343,6 +343,7 @@ async function runAgentPod(
   };
 
   const exitListeners: (() => void)[] = [];
+  let _resolvePod: () => void = () => {};
 
   try {
     await Promise.race([
@@ -352,7 +353,7 @@ async function runAgentPod(
 
     onProcess(
       {
-        kill: () => k8sRuntime.stopPod(podName),
+        kill: () => _resolvePod(),
         stdin: { write: () => {}, end: () => {} },
         on: (event: string, listener: () => void) => {
           if (event === 'exit') exitListeners.push(listener);
@@ -446,7 +447,6 @@ async function runAgentPod(
     const podCompletionPromise = (async () => {
       const startTime = Date.now();
       const MAX_POD_LIFE = 1800000;
-      let _resolvePod: () => void = () => {};
 
       // Real-time Watcher: Listen for the 'exit' sentinel in the IPC folder
       const fsWatcher = fs.watch(groupIpcDir, (eventType, filename) => {
@@ -519,7 +519,6 @@ async function runAgentPod(
           logger.warn({ podName }, 'Pod reached max life, killing');
           if (watchRequest) watchRequest.abort();
           fsWatcher.close();
-          k8sRuntime.stopPod(podName);
           _resolvePod();
         }
       }, 5000);
@@ -527,6 +526,11 @@ async function runAgentPod(
       await watchPromise;
       clearInterval(backupInterval);
       fsWatcher.close();
+
+      // Master Cleanup: The ONLY place where the pod is deleted.
+      try {
+        await k8sRuntime.stopPod(podName);
+      } catch (err) {}
 
       if (!firstOutputResolved) {
         try {
