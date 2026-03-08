@@ -206,6 +206,44 @@ export const Tools = {
       return 'Task scheduled.';
     }
   },
+  pause_task: {
+    description: 'Pause a scheduled task.',
+    schema: z.object({
+      id: z.string().describe('The task ID to pause'),
+    }),
+    fn: (args: any) => {
+      writeIpcFile(TASKS_DIR, { type: 'pause_task', ...args, timestamp: new Date().toISOString() });
+      return 'Task pause requested.';
+    }
+  },
+  resume_task: {
+    description: 'Resume a paused scheduled task.',
+    schema: z.object({
+      id: z.string().describe('The task ID to resume'),
+    }),
+    fn: (args: any) => {
+      writeIpcFile(TASKS_DIR, { type: 'resume_task', ...args, timestamp: new Date().toISOString() });
+      return 'Task resume requested.';
+    }
+  },
+  cancel_task: {
+    description: 'Cancel and delete a scheduled task.',
+    schema: z.object({
+      id: z.string().describe('The task ID to cancel'),
+    }),
+    fn: (args: any) => {
+      writeIpcFile(TASKS_DIR, { type: 'cancel_task', ...args, timestamp: new Date().toISOString() });
+      return 'Task cancellation requested.';
+    }
+  },
+  refresh_groups: {
+    description: 'Sync available groups and write metadata snapshot.',
+    schema: z.object({}),
+    fn: () => {
+      writeIpcFile(TASKS_DIR, { type: 'refresh_groups', timestamp: new Date().toISOString() });
+      return 'Group refresh requested.';
+    }
+  },
   create_discord_thread: {
     description: 'Create a new Discord thread and register a sub-agent group. IMPORTANT: This tool only creates the communication channel. You MUST call delegate_task separately to assign instructions and a mission to the sub-agent.',
     schema: z.object({
@@ -257,6 +295,36 @@ export const Tools = {
         timestamp: new Date().toISOString() 
       });
       return `Group "${args.name}" registration requested.`;
+    }
+  },
+  delete_group: {
+    description: 'Delete an existing agent group workspace.',
+    schema: z.object({
+      jid: z.string().describe('The JID of the group to delete'),
+    }),
+    fn: (args: any, context: any) => {
+      writeIpcFile(TASKS_DIR, { 
+        type: 'delete_group', 
+        jid: args.jid, 
+        sourceGroup: context.input.groupFolder, 
+        timestamp: new Date().toISOString() 
+      });
+      return `Deletion requested for ${args.jid}.`;
+    }
+  },
+  delete_discord_thread: {
+    description: 'Deletes an autonomous sub-agent and its associated Discord thread.',
+    schema: z.object({
+      jid: z.string().describe('The JID of the thread to delete'),
+    }),
+    fn: (args: any, context: any) => {
+      writeIpcFile(TASKS_DIR, { 
+        type: 'delete_discord_thread', 
+        jid: args.jid, 
+        sourceGroup: context.input.groupFolder, 
+        timestamp: new Date().toISOString() 
+      });
+      return `Discord thread deletion requested for ${args.jid}.`;
     }
   },
   list_groups: {
