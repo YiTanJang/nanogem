@@ -134,6 +134,10 @@ export class GeminiManager {
           ?.join('\n') || '';
         
         this.logTelemetry(`[FINAL_RESPONSE] ${finalText.substring(0, 100)}...`);
+        
+        // Use a tiny delay to ensure stderr buffer clears before stdout markers start
+        await new Promise(r => setTimeout(r, 10));
+        
         onOutput({ status: 'success', result: finalText });
 
         // Persistence
