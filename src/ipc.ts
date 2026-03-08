@@ -449,6 +449,9 @@ export async function processTaskIpc(
           availableGroups,
           new Set(Object.keys(deps.registeredGroups())),
         );
+
+        const feedbackJid = data.chatJid || sourceGroup;
+        await deps.sendMessage(feedbackJid, `Successfully deleted agent group: ${data.jid}`);
       } else {
         logger.warn(
           { data },
@@ -478,7 +481,8 @@ export async function processTaskIpc(
             new Set(Object.keys(deps.registeredGroups())),
           );
 
-          await deps.sendMessage(sourceGroup, `Successfully deleted sub-agent and its Discord thread: ${data.jid}`);
+          const feedbackJid = data.chatJid || sourceGroup;
+          await deps.sendMessage(feedbackJid, `Successfully deleted sub-agent and its Discord thread: ${data.jid}`);
         } else {
           logger.warn({ data }, 'Invalid delete_discord_thread request - missing jid');
         }
