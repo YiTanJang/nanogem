@@ -139,7 +139,10 @@ export async function stopPod(name: string): Promise<void> {
   try {
     await k8sApi.deleteNamespacedPod({ name, namespace: K8S_NAMESPACE });
     logger.info({ name, namespace: K8S_NAMESPACE }, 'Deleted agent pod');
-  } catch (err) {
+  } catch (err: any) {
+    if (err.code === 404 || err.response?.statusCode === 404 || err.response?.body?.code === 404) {
+      return; // Already gone
+    }
     logger.error({ err, name }, 'Failed to delete agent pod');
   }
 }
