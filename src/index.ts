@@ -315,7 +315,14 @@ export function _setRegisteredGroups(
 async function main(): Promise<void> {
   console.log("--- KANIKO_EVOLUTION_SUCCESS ---");
   await k8sRuntime.ensureK8sReady();
-  await k8sRuntime.cleanupOrphans();
+  const orphanedNames = await k8sRuntime.cleanupOrphans();
+  if (orphanedNames.length > 0) {
+    logger.info({ count: orphanedNames.length, names: orphanedNames }, 'Stopped orphaned agent pods');
+    // Safety: ensure queue knows these groups are no longer active
+    for (const jid of Object.keys(registeredGroups)) {
+      queue.notifyIdle(jid);
+    }
+  }
   initDatabase();
   loadState();
 
