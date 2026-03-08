@@ -400,9 +400,9 @@ export function getToolDeclarations(): any[] {
       name,
       description: tool.description,
       parameters: {
-        type: 'OBJECT',
-        properties: jsonSchema.properties,
-        required: jsonSchema.required,
+        type: 'object',
+        properties: jsonSchema.properties || {},
+        required: jsonSchema.required || [],
       }
     };
   });
