@@ -390,11 +390,13 @@ export const Tools = {
 };
 
 /**
- * Generate function declarations for the Gemini API.
+ * Generate function declarations for the Gemini API using native Zod 4 capabilities.
  */
 export function getToolDeclarations(): any[] {
   return Object.entries(Tools).map(([name, tool]) => {
-    const jsonSchema = zodToJsonSchema(tool.schema as any) as any;
+    // Zod 4.x has a native toJSONSchema method
+    const jsonSchema = (tool.schema as any).toJSONSchema();
+    
     return {
       name,
       description: tool.description,
