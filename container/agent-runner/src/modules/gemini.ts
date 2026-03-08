@@ -38,9 +38,15 @@ export class GeminiManager {
     return cache.name;
   }
 
-  async initChat(systemInstruction: string, history: any[], allTools: any[]) {
+  async initChat(agentIdentity: string, history: any[], allTools: any[]) {
+    // DEBUG: Verify the exact tool schema being passed to the model
+    const createThreadTool = allTools.find(t => t.name === 'create_discord_thread');
+    if (createThreadTool) {
+      console.error(`[debug-schema] create_discord_thread: ${JSON.stringify(createThreadTool.parameters.properties)}`);
+    }
+
     const config: any = {
-      systemInstruction,
+      systemInstruction: agentIdentity,
       tools: [{ functionDeclarations: allTools }]
     };
 
