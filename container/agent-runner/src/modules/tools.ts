@@ -207,7 +207,7 @@ export const Tools = {
     }
   },
   create_discord_thread: {
-    description: 'Create a new Discord thread and bind an autonomous sub-agent to it.',
+    description: 'Create a new Discord thread and register a sub-agent group. IMPORTANT: This tool only creates the communication channel. You MUST call delegate_task separately to assign instructions and a mission to the sub-agent.',
     schema: z.object({
       name: z.string().describe('Thread name'),
       parentJid: z.string().describe('Parent channel JID'),
