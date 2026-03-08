@@ -148,9 +148,9 @@ export const Tools = {
     }
   },
   submit_work: {
-    description: 'Submit the final result of your assigned Mission.',
+    description: 'Submit the final result of your assigned Mission. MANDATORY: Use this tool when your task is complete to notify the manager, even if you are restricted from direct user communication.',
     schema: z.object({
-      result: z.string().describe('The final outcome or report'),
+      result: z.string().describe('The final outcome or report summary'),
     }),
     fn: (args: any, context: any) => {
       const missionPath = path.join('/workspace/group', '.nanogem', 'mission.json');
