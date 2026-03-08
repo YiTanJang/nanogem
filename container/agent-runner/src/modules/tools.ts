@@ -328,11 +328,18 @@ export const Tools = {
     }
   },
   list_groups: {
-    description: 'List all registered and available agent groups.',
+    description: 'List all registered and available agent groups. Always use this to find the JID of a newly created sub-agent.',
     schema: z.object({}),
     fn: (_args: any, _context: any) => {
+      // First, request a refresh to ensure the snapshot is fresh
+      writeIpcFile(TASKS_DIR, { type: 'refresh_groups', timestamp: new Date().toISOString() });
+      
       const groupsFile = '/workspace/ipc/available_groups.json';
-      return fs.existsSync(groupsFile) ? fs.readFileSync(groupsFile, 'utf-8') : 'Group list not available.';
+      if (!fs.existsSync(groupsFile)) return 'Group list not available yet. Please wait a few seconds and try again.';
+      
+      // Return the current snapshot
+      const content = fs.readFileSync(groupsFile, 'utf-8');
+      return content;
     }
   },
   append_thought: {
