@@ -394,8 +394,12 @@ export const Tools = {
  */
 export function getToolDeclarations(): any[] {
   return Object.entries(Tools).map(([name, tool]) => {
-    const jsonSchema = zodToJsonSchema(tool.schema as any) as any;
-    // Map JSON Schema to Gemini Function Declaration format
+    // Generate a schema that is guaranteed to be compatible with Gemini/OpenAI
+    const jsonSchema = zodToJsonSchema(tool.schema as any, { 
+      target: 'openApi3',
+      $refStrategy: 'none' // Flatten the schema, no internal references
+    }) as any;
+    
     return {
       name,
       description: tool.description,
