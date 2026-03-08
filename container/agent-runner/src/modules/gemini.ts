@@ -55,6 +55,11 @@ export class GeminiManager {
     });
   }
 
+  private logTelemetry(text: string) {
+    // Continuous output to stderr for real-time visibility in 'kubectl logs -f'
+    console.error(`[TELEMETRY] ${text}`);
+  }
+
   async runLoop(
     initialPrompt: string | any[],
     functions: Record<string, (args: any) => Promise<string> | string>,
@@ -65,7 +70,7 @@ export class GeminiManager {
 
     while (true) {
       try {
-        console.error(`[agent-runner] Querying Gemini (${this.modelName})...`);
+        this.logTelemetry(`--- QUERYING GEMINI (${this.modelName}) ---`);
         
         let parts: any[] = [];
         if (typeof currentPrompt === 'string' && currentPrompt.includes('<media')) {
@@ -78,12 +83,29 @@ export class GeminiManager {
 
         let result = await this.chat.sendMessage({ message: parts });
 
-        // Tool Loop
-        while (result.candidates?.[0]?.content?.parts?.some((p: any) => p.functionCall)) {
-          const callParts = result.candidates[0].content.parts!.filter((p: any) => p.functionCall);
-          
+        // Continuous Tool & Thought Loop
+        while (true) {
+          const candidate = result.candidates?.[0];
+          const responseParts = candidate?.content?.parts || [];
+
+          // 1. Stream System Telemetry
+          for (const part of responseParts) {
+            if (part.text) {
+              this.logTelemetry(`[THOUGHT] ${part.text}`);
+            }
+            if ((part as any).thought) {
+              this.logTelemetry(`[REASONING] ${(part as any).thought}`);
+            }
+          }
+
+          // 2. Identify and Log Tool Calls
+          const callParts = responseParts.filter((p: any) => p.functionCall);
+          if (callParts.length === 0) break; // turn finished
+
           const responses = await Promise.all(callParts.map(async (part: any) => {
             const { name, args } = part.functionCall!;
+            this.logTelemetry(`[TOOL_CALL] ${name}(${JSON.stringify(args)})`);
+            
             try {
               let output;
               if (mcpManager.isMcpTool(name!)) {
@@ -92,8 +114,13 @@ export class GeminiManager {
                 const fn = functions[name!];
                 output = await Promise.resolve(fn ? fn(args) : `Error: Tool ${name} not found`);
               }
+              
+              const outputStr = typeof output === 'string' ? output : JSON.stringify(output);
+              this.logTelemetry(`[TOOL_RESULT] ${name} -> ${outputStr.substring(0, 500)}${outputStr.length > 500 ? '...' : ''}`);
+              
               return { functionResponse: { name, response: { content: output } } };
             } catch (err: any) {
+              this.logTelemetry(`[TOOL_ERROR] ${name} -> ${err.message}`);
               return { functionResponse: { name, response: { content: `Error: ${err.message}` } } };
             }
           }));
@@ -101,12 +128,13 @@ export class GeminiManager {
           result = await this.chat.sendMessage({ message: responses as any });
         }
 
-        const text = result.candidates?.[0]?.content?.parts
+        const finalText = result.candidates?.[0]?.content?.parts
           ?.filter((p: any) => p.text)
           ?.map((p: any) => p.text)
           ?.join('\n') || '';
         
-        onOutput({ status: 'success', result: text });
+        this.logTelemetry(`[FINAL_RESPONSE] ${finalText.substring(0, 100)}...`);
+        onOutput({ status: 'success', result: finalText });
 
         // Persistence
         const historyPath = path.join('/workspace/group', '.nanogem', 'history.json');
@@ -115,9 +143,10 @@ export class GeminiManager {
 
         // Wait for follow-up
         currentPrompt = await this.waitForFollowUp();
-        if (!currentPrompt) return; // Exit signal or timeout
+        if (!currentPrompt) return; 
 
       } catch (err: any) {
+        this.logTelemetry(`[CRITICAL_ERROR] ${err.message}`);
         onOutput({ status: 'error', result: null, error: err.message });
         return;
       }

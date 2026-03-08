@@ -267,6 +267,58 @@ export const Tools = {
       return fs.existsSync(groupsFile) ? fs.readFileSync(groupsFile, 'utf-8') : 'Group list not available.';
     }
   },
+  append_thought: {
+    description: 'Manually append a progress update or reasoning to the group THOUGHTS.log.',
+    schema: z.object({
+      text: z.string().describe('The thought content to record'),
+    }),
+    fn: (args: any) => {
+      const logPath = '/workspace/group/THOUGHTS.log';
+      const timestamp = new Date().toISOString();
+      try {
+        fs.appendFileSync(logPath, `[${timestamp}] [USER_FACING_THOUGHT] ${args.text}\n`);
+        return 'Thought appended to NAS log.';
+      } catch (e: any) {
+        return `Error: ${e.message}`;
+      }
+    }
+  },
+  wait_for_report: {
+    description: 'Wait for a sub-agent to finish its task and write a REPORT.md file.',
+    schema: z.object({
+      folder: z.string().describe('Sub-agent folder name'),
+      timeoutMs: z.number().optional().default(300000),
+    }),
+    fn: async (args: any) => {
+      const reportPath = path.join('/workspace/project/groups', args.folder, 'REPORT.md');
+      const start = Date.now();
+      while (Date.now() - start < args.timeoutMs) {
+        if (fs.existsSync(reportPath)) {
+          return fs.readFileSync(reportPath, 'utf-8');
+        }
+        await new Promise(r => setTimeout(r, 5000));
+      }
+      return 'Timeout waiting for report.';
+    }
+  },
+  follow_stream: {
+    description: 'Follow the live THOUGHTS.log stream of a sub-agent.',
+    schema: z.object({
+      folder: z.string().describe('Sub-agent folder name'),
+      lines: z.number().optional().default(10),
+    }),
+    fn: (args: any) => {
+      const logPath = path.join('/workspace/project/groups', args.folder, 'THOUGHTS.log');
+      try {
+        if (!fs.existsSync(logPath)) return 'Log file not found.';
+        const content = fs.readFileSync(logPath, 'utf-8');
+        const lines = content.trim().split('\n');
+        return lines.slice(-args.lines).join('\n');
+      } catch (e: any) {
+        return `Error: ${e.message}`;
+      }
+    }
+  },
 };
 
 /**
