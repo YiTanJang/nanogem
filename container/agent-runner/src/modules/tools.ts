@@ -245,12 +245,12 @@ export const Tools = {
     }
   },
   create_discord_thread: {
-    description: 'Create a new Discord thread and register a sub-agent group. IMPORTANT: This tool ONLY creates the workspace and thread. The sub-agent will NOT start working until you call delegate_task separately to assign its mission.',
+    description: 'Create a new Discord thread and register a sub-agent group. IMPORTANT: The systemInstruction parameter defines the sub-agents PERMANENT IDENTITY and core personality rules. To assign a specific temporary task or mission, you MUST call delegate_task separately.',
     schema: z.object({
       name: z.string().describe('Thread name'),
       parentJid: z.string().describe('Parent channel JID'),
       folder: z.string().describe('Sub-agent folder name'),
-      systemInstruction: z.string().describe('Core instructions for the sub-agent'),
+      systemInstruction: z.string().describe('The permanent identity and core personality for the sub-agent'),
       ephemeral: z.boolean().optional().default(true),
     }),
     fn: (args: any, context: any) => {
