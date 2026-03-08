@@ -5,19 +5,12 @@
 import * as k8s from '@kubernetes/client-node';
 import path from 'path';
 import { logger } from './logger.js';
+import { K8S_NAMESPACE } from './config.js';
 
 const kc = new k8s.KubeConfig();
 kc.loadFromDefault();
-
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
 const batchApi = kc.makeApiClient(k8s.BatchV1Api);
-
-const K8S_NAMESPACE = process.env.K8S_NAMESPACE || 'nanogem';
-
-export interface BuildJobResult {
-  status: 'success' | 'error';
-  error?: string;
-}
 
 export async function runBuildJob(
   imageTag: string,
@@ -27,30 +20,80 @@ export async function runBuildJob(
   contextPath: string = '.',
   shouldRollout: boolean = false,
   customJobName?: string,
-): Promise<BuildJobResult> {
+): Promise<{ status: 'success' | 'error'; error?: string }> {
   const jobName = customJobName || `nanogem-build-${Date.now()}`;
+  
+  // Resolve context path relative to the internal container mount point
+  const fullContextPath = path.join('/workspace/project', contextPath);
+
   const jobSpec: k8s.V1Job = {
-    metadata: { name: jobName, namespace: K8S_NAMESPACE },
+    metadata: { name: jobName },
     spec: {
       template: {
         spec: {
+          serviceAccountName: 'nanogem-builder',
+          restartPolicy: 'Never',
           containers: [
             {
               name: 'kaniko',
               image: 'gcr.io/kaniko-project/executor:latest',
               args: [
-                `--context=dir:///workspace/${contextPath}`,
                 `--dockerfile=${dockerfilePath}`,
+                `--context=dir://${fullContextPath}`,
                 `--destination=${imageTag}`,
-                '--skip-tls-verify',
                 '--insecure',
-                '--cache=true',
+                '--skip-tls-verify',
+                '--digest-file=/shared/done'
               ],
-              volumeMounts: [{ name: 'workspace', mountPath: '/workspace', subPath: pvcSubPath }],
+              volumeMounts: [
+                {
+                  name: 'project-source',
+                  mountPath: '/workspace/project',
+                  subPath: pvcSubPath,
+                },
+                {
+                  name: 'shared-data',
+                  mountPath: '/shared',
+                },
+              ],
+            },
+            {
+              name: 'rollout-trigger',
+              image: 'bitnami/kubectl:latest',
+              command: ['/bin/sh', '-c'],
+              args: [
+                `
+                echo "Waiting for kaniko to finish..."
+                while [ ! -s /shared/done ]; do 
+                  if [ -f /shared/error ]; then echo "Build failed"; exit 1; fi
+                  sleep 2
+                done
+                if [ "${shouldRollout}" = "true" ]; then
+                  echo "Build successful, triggering rollout..."
+                  kubectl patch deployment nanogem -p "{\\\"spec\\\":{\\\"template\\\":{\\\"metadata\\\":{\\\"annotations\\\":{\\\"kubectl.kubernetes.io/restartedAt\\\":\\\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\\"}}}}} "
+                else
+                  echo "Build successful, skipping rollout as requested."
+                fi
+                `
+              ],
+              volumeMounts: [
+                {
+                  name: 'shared-data',
+                  mountPath: '/shared',
+                },
+              ],
             },
           ],
-          volumes: [{ name: 'workspace', persistentVolumeClaim: { claimName: pvcName } }],
-          restartPolicy: 'Never',
+          volumes: [
+            {
+              name: 'project-source',
+              persistentVolumeClaim: { claimName: pvcName },
+            },
+            {
+              name: 'shared-data',
+              emptyDir: {},
+            },
+          ],
         },
       },
       backoffLimit: 0,
@@ -58,14 +101,22 @@ export async function runBuildJob(
   };
 
   try {
-    await batchApi.createNamespacedJob({ namespace: K8S_NAMESPACE, body: jobSpec });
-    
+    logger.info({ jobName, imageTag, contextPath, shouldRollout }, 'Starting dynamic Kaniko build job');
+    await batchApi.createNamespacedJob({
+      namespace: K8S_NAMESPACE,
+      body: jobSpec,
+    });
+
     // Poll for completion
-    for (let i = 0; i < 60; i++) {
-      const res = await batchApi.readNamespacedJobStatus({ name: jobName, namespace: K8S_NAMESPACE });
+    for (let i = 0; i < 60; i++) { // 10 minute timeout (10s * 60)
+      const res = await batchApi.readNamespacedJobStatus({
+        name: jobName,
+        namespace: K8S_NAMESPACE,
+      });
       const status = res.status;
       if (status?.succeeded && status.succeeded > 0) {
         logger.info({ jobName }, 'Build job succeeded');
+        // Clean up successful job
         await batchApi.deleteNamespacedJob({ name: jobName, namespace: K8S_NAMESPACE });
         return { status: 'success' };
       }
@@ -76,6 +127,7 @@ export async function runBuildJob(
       }
       await new Promise((r) => setTimeout(r, 10000));
     }
+
     return { status: 'error', error: 'Build job timed out' };
   } catch (err) {
     logger.error({ err, jobName }, 'Failed to trigger build job');
@@ -95,6 +147,19 @@ export async function stopPod(name: string): Promise<void> {
   }
 }
 
+export async function ensureK8sReady(): Promise<void> {
+  try {
+    await k8sApi.listNamespacedPod({ namespace: K8S_NAMESPACE });
+    logger.info(
+      { namespace: K8S_NAMESPACE },
+      'Kubernetes API connection healthy',
+    );
+  } catch (err) {
+    logger.error({ err }, 'Kubernetes API connection failed');
+    throw new Error('Kubernetes is enabled but API is unreachable');
+  }
+}
+
 export async function runAgentPod(podSpec: k8s.V1Pod): Promise<string> {
   const res = await k8sApi.createNamespacedPod({
     namespace: K8S_NAMESPACE,
@@ -106,7 +171,7 @@ export async function runAgentPod(podSpec: k8s.V1Pod): Promise<string> {
 export async function cleanupOrphans(): Promise<string[]> {
   const stoppedNames: string[] = [];
   try {
-    // 1. Cleanup agent pods
+    // Cleanup agent pods using both legacy and current labels
     const res = await k8sApi.listNamespacedPod({
       namespace: K8S_NAMESPACE,
       labelSelector: 'app.kubernetes.io/managed-by=nanogem',
@@ -117,15 +182,27 @@ export async function cleanupOrphans(): Promise<string[]> {
     });
 
     const pods = [...(res.items || []), ...(res2.items || [])];
-    const uniquePodNames = Array.from(new Set(pods.map(p => p.metadata?.name).filter(Boolean) as string[]));
+    const uniquePods = Array.from(new Set(pods.map(p => p.metadata?.name)))
+      .map(name => pods.find(p => p.metadata?.name === name));
 
-    for (const podName of uniquePodNames) {
-      await stopPod(podName);
-      stoppedNames.push(podName);
+    for (const pod of uniquePods) {
+      if (pod && pod.metadata?.name) {
+        await stopPod(pod.metadata.name);
+        stoppedNames.push(pod.metadata.name);
+      }
     }
 
-    // 2. Cleanup old build jobs
-    const jobRes = await batchApi.listNamespacedJob({ namespace: K8S_NAMESPACE });
+    if (uniquePods.length > 0) {
+      logger.info(
+        { count: uniquePods.length, names: stoppedNames },
+        'Stopped orphaned agent pods',
+      );
+    }
+
+    // Cleanup old build jobs
+    const jobRes = await batchApi.listNamespacedJob({
+      namespace: K8S_NAMESPACE,
+    });
     const jobs = jobRes.items || [];
     for (const job of jobs) {
       if (job.metadata?.name?.startsWith('nanogem-build-')) {
@@ -133,7 +210,7 @@ export async function cleanupOrphans(): Promise<string[]> {
         if (status?.succeeded || status?.failed) {
           logger.info({ job: job.metadata.name }, 'Cleaning up completed build job');
           await batchApi.deleteNamespacedJob({
-            name: job.metadata.name!,
+            name: job.metadata.name,
             namespace: K8S_NAMESPACE,
             propagationPolicy: 'Background',
           });
@@ -145,16 +222,3 @@ export async function cleanupOrphans(): Promise<string[]> {
   }
   return stoppedNames;
 }
-
-export async function ensureK8sReady(): Promise<void> {
-  try {
-    await k8sApi.listNamespacedPod({ namespace: K8S_NAMESPACE });
-    logger.info({ namespace: K8S_NAMESPACE }, 'Kubernetes API connection healthy');
-  } catch (err) {
-    logger.error({ err }, 'Kubernetes API connection failed');
-    throw err;
-  }
-}
-
-export function getK8sApi() { return k8sApi; }
-export { kc };
