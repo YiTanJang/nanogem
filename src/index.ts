@@ -99,8 +99,8 @@ function registerGroup(jid: string, group: RegisteredGroup): void {
   setRegisteredGroup(jid, group);
   queue.setRegisteredGroups(registeredGroups);
   fs.mkdirSync(path.join(groupDir, 'logs'), { recursive: true });
-  if (group.systemInstruction) {
-    fs.writeFileSync(path.join(groupDir, 'GEMINI.md'), group.systemInstruction);
+  if (group.agentIdentity) {
+    fs.writeFileSync(path.join(groupDir, 'GEMINI.md'), group.agentIdentity);
   }
   logger.info({ jid, name: group.name, folder: group.folder }, 'Group registered');
 }

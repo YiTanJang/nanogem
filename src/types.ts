@@ -39,7 +39,7 @@ export interface RegisteredGroup {
   added_at: string;
   containerConfig?: ContainerConfig;
   requiresTrigger?: boolean; // Default: true for groups, false for solo chats
-  systemInstruction?: string; // Core identity/soul for specialist agents
+  agentIdentity?: string; // Core permanent persona for the agent
   ephemeral?: boolean; // If true, the folder is deleted on unregistration
 }
 

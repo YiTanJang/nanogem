@@ -245,12 +245,12 @@ export const Tools = {
     }
   },
   create_discord_thread: {
-    description: 'Create a new Discord thread and register a sub-agent group. IMPORTANT: The systemInstruction parameter defines the sub-agents PERMANENT IDENTITY and core personality rules. To assign a specific temporary task or mission, you MUST call delegate_task separately.',
+    description: 'Create a new Discord thread and register a sub-agent group. IMPORTANT: The agentIdentity parameter defines the sub-agents PERMANENT IDENTITY. To assign a specific temporary task, you MUST call delegate_task separately.',
     schema: z.object({
       name: z.string().describe('Thread name'),
       parentJid: z.string().describe('Parent channel JID'),
       folder: z.string().describe('Sub-agent folder name'),
-      systemInstruction: z.string().describe('The permanent identity and core personality for the sub-agent'),
+      agentIdentity: z.string().describe('The permanent identity and core personality for the sub-agent'),
       ephemeral: z.boolean().optional().default(true),
     }),
     fn: (args: any, context: any) => {
@@ -280,7 +280,7 @@ export const Tools = {
       name: z.string(),
       folder: z.string(),
       trigger: z.string(),
-      systemInstruction: z.string(),
+      agentIdentity: z.string().describe('The permanent persona and core rules for the agent'),
       jid: z.string().optional(),
       requiresTrigger: z.boolean().optional(),
       ephemeral: z.boolean().optional(),

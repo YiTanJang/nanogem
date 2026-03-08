@@ -208,6 +208,7 @@ export async function processTaskIpc(
     trigger?: string;
     requiresTrigger?: boolean;
     systemInstruction?: string;
+    agentIdentity?: string;
     ephemeral?: boolean;
     containerConfig?: RegisteredGroup['containerConfig'];
     // For rebuild_self/build_project
@@ -408,7 +409,7 @@ export async function processTaskIpc(
           added_at: new Date().toISOString(),
           containerConfig: data.containerConfig,
           requiresTrigger: data.requiresTrigger,
-          systemInstruction: data.systemInstruction,
+          agentIdentity: data.agentIdentity || data.systemInstruction,
           ephemeral: data.ephemeral,
         });
 
@@ -509,7 +510,8 @@ export async function processTaskIpc(
 
     case 'create_discord_thread':
       if (isMain && deps.createDiscordThread) {
-        if (data.parentJid && data.name && data.folder && data.systemInstruction) {
+        const identity = data.agentIdentity || data.systemInstruction;
+        if (data.parentJid && data.name && data.folder && identity) {
           try {
             // 1. Create the physical thread on Discord
             const thread = await deps.createDiscordThread(data.parentJid, data.name);
@@ -528,7 +530,7 @@ export async function processTaskIpc(
               added_at: new Date().toISOString(),
               containerConfig: data.containerConfig,
               requiresTrigger: false, // DMs and Threads are exclusive contexts
-              systemInstruction: data.systemInstruction,
+              agentIdentity: identity,
               ephemeral: data.ephemeral ?? true, // Default to true for dynamic threads
             });
 
