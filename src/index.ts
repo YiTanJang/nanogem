@@ -376,7 +376,12 @@ async function main(): Promise<void> {
     registerGroup,
     deleteGroup: (jid) => {
       const group = registeredGroups[jid];
-      if (group?.ephemeral) fs.rmSync(resolveGroupFolderPath(group.folder), { recursive: true, force: true });
+      if (!group) return;
+      if (group.folder === MAIN_GROUP_FOLDER) {
+        logger.warn({ jid }, 'Attempted to delete protected main group blocked');
+        return;
+      }
+      if (group.ephemeral) fs.rmSync(resolveGroupFolderPath(group.folder), { recursive: true, force: true });
       deleteRegisteredGroup(jid);
       delete registeredGroups[jid];
       queue.setRegisteredGroups(registeredGroups);
@@ -386,8 +391,22 @@ async function main(): Promise<void> {
     getAvailableGroups,
     writeGroupsSnapshot: (gf, im, ag, rj) => writeGroupsSnapshot(gf, im, ag, rj),
     runBuildJob: k8sRuntime.runBuildJob,
-    createDiscordThread: discord ? (parentJid, name) => discord!.createThread(parentJid, name) : undefined,
-    deleteDiscordThread: discord ? (jid) => discord!.deleteThread(jid) : undefined,
+    createDiscordThread: discord
+      ? (parentJid: string, name: string) => discord!.createThread(parentJid, name)
+      : undefined,
+    deleteDiscordThread: discord
+      ? async (jid) => {
+          const group = registeredGroups[jid];
+          await discord!.deleteThread(jid);
+          if (group) { // Only attempt to delete internal registration if it exists
+              if (group.ephemeral) fs.rmSync(resolveGroupFolderPath(group.folder), { recursive: true, force: true });
+              deleteRegisteredGroup(jid);
+              delete registeredGroups[jid];
+              queue.setRegisteredGroups(registeredGroups);
+              saveState();
+          }
+        }
+      : undefined,
   });
 
   queue.setProcessMessagesFn(processGroupMessages);

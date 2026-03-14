@@ -447,6 +447,15 @@ export async function processTaskIpc(
           break;
         }
 
+        // Safety: Prevent deletion of main group
+        const group = deps.registeredGroups()[data.jid];
+        if (group?.folder === MAIN_GROUP_FOLDER) {
+          const feedbackJid = data.chatJid || sourceGroup;
+          await deps.sendMessage(feedbackJid, `Error: Cannot delete the protected main group.`);
+          logger.warn({ jid: data.jid, sourceGroup }, 'Blocked attempt to delete main group');
+          break;
+        }
+
         logger.info({ jid: data.jid }, 'Deleting group via IPC');
         deps.deleteGroup(data.jid);
 
@@ -477,6 +486,15 @@ export async function processTaskIpc(
             const feedbackJid = data.chatJid || sourceGroup;
             await deps.sendMessage(feedbackJid, `Error: '${data.jid}' is NOT a Discord thread. Use 'delete_group' for internal agents.`);
             logger.warn({ jid: data.jid, sourceGroup }, 'Rejected delete_discord_thread for non-Discord JID');
+            break;
+          }
+
+          // Safety: Prevent deletion of main group
+          const group = deps.registeredGroups()[data.jid];
+          if (group?.folder === MAIN_GROUP_FOLDER) {
+            const feedbackJid = data.chatJid || sourceGroup;
+            await deps.sendMessage(feedbackJid, `Error: Cannot delete the protected main group.`);
+            logger.warn({ jid: data.jid, sourceGroup }, 'Blocked attempt to delete main thread');
             break;
           }
 
