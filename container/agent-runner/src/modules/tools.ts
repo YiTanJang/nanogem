@@ -37,15 +37,15 @@ export const Tools = {
     }
   },
   read_file: {
-    description: 'Read the contents of a file in the workspace.',
+    description: 'Read a file from the workspace. Use paths starting with "project/" for shared files, or "group/" for your private workspace.',
     schema: z.object({
-      path: z.string().describe('Path relative to /workspace/group'),
+      path: z.string().describe('The file path to read'),
     }),
     fn: (args: any, _context: any) => {
       try {
-        const fullPath = path.isAbsolute(args.path) ? args.path : path.resolve('/workspace/group', args.path);
+        const fullPath = path.isAbsolute(args.path) ? args.path : path.resolve('/workspace', args.path);
         if (!fullPath.startsWith('/workspace/group') && !fullPath.startsWith('/workspace/project'))
-          return 'Error: Access denied.';
+          return 'Error: Access denied. Paths must be in /workspace/group or /workspace/project.';
         return fs.readFileSync(fullPath, 'utf-8');
       } catch (err: any) {
         return `Error: ${err.message}`;
@@ -55,14 +55,14 @@ export const Tools = {
   write_file: {
     description: 'Write or overwrite a file in the workspace.',
     schema: z.object({
-      path: z.string().describe('Path relative to /workspace/group'),
+      path: z.string().describe('Path relative to /workspace'),
       content: z.string().describe('Content to write'),
     }),
     fn: (args: any, _context: any) => {
       try {
-        const fullPath = path.isAbsolute(args.path) ? args.path : path.resolve('/workspace/group', args.path);
+        const fullPath = path.isAbsolute(args.path) ? args.path : path.resolve('/workspace', args.path);
         if (!fullPath.startsWith('/workspace/group') && !fullPath.startsWith('/workspace/project'))
-          return 'Error: Access denied.';
+          return 'Error: Access denied. Paths must be in /workspace/group or /workspace/project.';
         fs.mkdirSync(path.dirname(fullPath), { recursive: true });
         fs.writeFileSync(fullPath, args.content);
         return `Successfully wrote to ${args.path}`;
@@ -74,15 +74,15 @@ export const Tools = {
   edit_file: {
     description: 'Edit a file using search and replace.',
     schema: z.object({
-      path: z.string().describe('Path to the file'),
+      path: z.string().describe('Path to the file relative to /workspace'),
       oldText: z.string().describe('The exact text to replace'),
       newText: z.string().describe('The replacement text'),
     }),
     fn: (args: any, _context: any) => {
       try {
-        const fullPath = path.isAbsolute(args.path) ? args.path : path.resolve('/workspace/group', args.path);
+        const fullPath = path.isAbsolute(args.path) ? args.path : path.resolve('/workspace', args.path);
         if (!fullPath.startsWith('/workspace/group') && !fullPath.startsWith('/workspace/project'))
-          return 'Error: Access denied.';
+          return 'Error: Access denied. Paths must be in /workspace/group or /workspace/project.';
         const content = fs.readFileSync(fullPath, 'utf-8');
         if (!content.includes(args.oldText)) return 'Error: oldText not found.';
         const newContent = content.replace(args.oldText, args.newText);

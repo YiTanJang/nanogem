@@ -49,8 +49,8 @@ RUN mkdir -p /workspace/group /workspace/global /workspace/extra /workspace/ipc/
 # Switch to non-root user (required for --dangerously-skip-permissions)
 USER node
 
-# Set working directory to group workspace
-WORKDIR /workspace/group
+# Set working directory to project-accessible workspace
+WORKDIR /workspace/
 
 # Entry point reads JSON from stdin, outputs JSON to stdout
 ENTRYPOINT ["/app/entrypoint.sh"]
