@@ -68,12 +68,13 @@ export class GroupQueue {
 
     if (state.active) {
       state.pendingMessages = true;
-      logger.debug({ groupJid }, 'Pod active, message queued');
+      logger.info({ groupJid }, 'Queue: Pod already active, queuing message check for next idle cycle');
       return;
     }
 
+    logger.info({ groupJid }, 'Queue: Enqueuing fresh message check');
     this.runForGroup(groupJid, 'messages').catch((err) =>
-      logger.error({ groupJid, err }, 'Unhandled error in runForGroup'),
+      logger.error({ groupJid, err }, 'Queue: Unhandled error in runForGroup'),
     );
   }
 
@@ -85,7 +86,7 @@ export class GroupQueue {
     const state = this.getGroup(groupJid);
 
     if (state.pendingTasks.some((t) => t.id === taskId)) {
-      logger.debug({ groupJid, taskId }, 'Task already queued, skipping');
+      logger.debug({ groupJid, taskId }, 'Queue: Task already queued, skipping');
       return;
     }
 
@@ -94,13 +95,14 @@ export class GroupQueue {
       if (state.idleWaiting) {
         this.closeStdin(groupJid);
       }
-      logger.debug({ groupJid, taskId }, 'Pod active, task queued');
+      logger.info({ groupJid, taskId }, 'Queue: Pod active, task queued');
       return;
     }
 
+    logger.info({ groupJid, taskId }, 'Queue: Running task immediately');
     // Run immediately (Kubernetes handles concurrency)
     this.runTask(groupJid, { id: taskId, groupJid, fn }).catch((err) =>
-      logger.error({ groupJid, taskId, err }, 'Unhandled error in runTask'),
+      logger.error({ groupJid, taskId, err }, 'Queue: Unhandled error in runTask'),
     );
   }
 
@@ -294,12 +296,12 @@ export class GroupQueue {
     // --- BUG FIX: Health Check ---
     // If the group is marked active but has no recorded process, or the process is dead, reset it.
     if (state.active && !state.process) {
-      logger.warn({ groupJid }, 'Queue state was locked active with no process. Auto-unlocking.');
+      logger.info({ groupJid }, 'Queue Watchdog: Active state stale (no process). Resetting to idle.');
       state.active = false;
     }
 
     if (state.active) {
-      logger.debug({ groupJid }, 'Group is active, skipping drain');
+      logger.info({ groupJid }, 'Queue: Skipping drain, group is still active.');
       return;
     }
 

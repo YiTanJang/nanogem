@@ -316,18 +316,24 @@ export function _setRegisteredGroups(
 }
 
 async function main(): Promise<void> {
-  console.log("--- KANIKO_EVOLUTION_SUCCESS ---");
+  logger.info({ 
+    version: '1.1.3', 
+    node: process.version, 
+    namespace: process.env.K8S_NAMESPACE || 'nanogem' 
+  }, 'NanoGem Orchestrator starting up...');
+
   await k8sRuntime.ensureK8sReady();
   const orphanedNames = await k8sRuntime.cleanupOrphans();
   if (orphanedNames.length > 0) {
-    logger.info({ count: orphanedNames.length, names: orphanedNames }, 'Stopped orphaned agent pods');
-    // Safety: ensure queue knows these groups are no longer active
+    logger.info({ count: orphanedNames.length, names: orphanedNames }, 'Cleanup complete: Stopped orphaned agent pods');
     for (const jid of Object.keys(registeredGroups)) {
       queue.notifyIdle(jid);
     }
   }
+  
   initDatabase();
   loadState();
+  logger.info({ groups: Object.keys(registeredGroups) }, 'System state fully reloaded');
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Shutdown signal received');
