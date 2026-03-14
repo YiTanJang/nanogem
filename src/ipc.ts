@@ -29,7 +29,7 @@ export interface IpcDeps {
   registeredGroups: () => Record<string, RegisteredGroup>;
   registerGroup: (jid: string, group: RegisteredGroup) => void;
   deleteGroup: (jid: string) => void;
-  syncGroupMetadata: (force: boolean) => Promise<void>;
+  resetQueue: (jid: string) => void;
   getAvailableGroups: () => AvailableGroup[];
   writeGroupsSnapshot: (
     groupFolder: string,
@@ -190,33 +190,6 @@ export function startIpcWatcher(deps: IpcDeps): void {
   logger.info('IPC watcher started (per-group namespaces)');
 }
 
-/**
- * Smart Router: Resolves a human-readable target (Name, Folder, or JID) to a verified JID.
- */
-function resolveSmartTarget(target: string, groups: Record<string, RegisteredGroup>): string | undefined {
-  if (!target) return undefined;
-  
-  // 1. Literal JID match (if it's already registered, use it)
-  if (groups[target]) return target;
-
-  // 2. Name or Folder match (Role-Based Addressing)
-  // We check this if the literal JID failed, regardless of format.
-  const resolved = Object.entries(groups)
-    .filter(([_, g]) => 
-      g.name.toLowerCase() === target.toLowerCase() || 
-      g.folder.toLowerCase() === target.toLowerCase() ||
-      target.toLowerCase().includes(g.folder.toLowerCase()) // Handle partial hallucination
-    )
-    .sort((a, b) => new Date(b[1].added_at).getTime() - new Date(a[1].added_at).getTime());
-
-  if (resolved.length > 0) {
-    logger.info({ target, resolved: resolved[0][0] }, 'Resolved target via Aggressive Smart Router');
-    return resolved[0][0];
-  }
-
-  return undefined;
-}
-
 export async function processTaskIpc(
   data: {
     type: string;
@@ -257,31 +230,44 @@ export async function processTaskIpc(
   const registeredGroups = deps.registeredGroups();
 
   switch (data.type) {
-    case 'write_mission': {
-      const targetJid = resolveSmartTarget(data.targetJid || '', registeredGroups);
-      if (targetJid && data.mission) {
-        const targetGroup = registeredGroups[targetJid];
+    case 'write_mission':
+      if (data.targetJid && data.mission) {
+        const targetGroup = registeredGroups[data.targetJid];
+        if (!targetGroup) {
+          logger.warn({ targetJid: data.targetJid }, 'Cannot write mission: target not registered');
+          break;
+        }
+
         const targetFolder = targetGroup.folder;
         const missionDir = path.join(GROUPS_DIR, targetFolder, '.nanogem');
         fs.mkdirSync(missionDir, { recursive: true });
         fs.writeFileSync(path.join(missionDir, 'mission.json'), JSON.stringify(data.mission, null, 2));
-        logger.info({ from: sourceGroup, to: targetFolder, resolvedJid: targetJid }, 'Mission routed successfully');
-      } else if (data.targetJid) {
-        logger.warn({ target: data.targetJid }, 'Smart Router failed to find mission target');
+        logger.info({ from: sourceGroup, to: targetFolder }, 'Mission written to disk');
+        
+        // Critical: reset queue so the pod spawns immediately for the new mission
+        deps.resetQueue(data.targetJid);
       }
       break;
-    }
 
-    case 'schedule_task': {
-      const targetJid = resolveSmartTarget(data.targetJid || '', registeredGroups);
+    case 'schedule_task':
       if (
         data.prompt &&
         data.schedule_type &&
         data.schedule_value &&
-        targetJid
+        data.targetJid
       ) {
         // Resolve the target group from JID
+        const targetJid = data.targetJid as string;
         const targetGroupEntry = registeredGroups[targetJid];
+
+        if (!targetGroupEntry) {
+          logger.warn(
+            { targetJid },
+            'Cannot schedule task: target group not registered',
+          );
+          break;
+        }
+
         const targetFolder = targetGroupEntry.folder;
 
         // Authorization: non-main groups can only schedule for themselves
@@ -354,7 +340,6 @@ export async function processTaskIpc(
         logger.warn({ data }, 'Invalid schedule_task request - missing fields');
       }
       break;
-    }
 
     case 'pause_task':
       if (data.taskId) {
@@ -385,7 +370,13 @@ export async function processTaskIpc(
 
     case 'refresh_groups':
       if (isMain) {
-        await deps.syncGroupMetadata(true);
+        const availableGroups = deps.getAvailableGroups();
+        deps.writeGroupsSnapshot(
+          sourceGroup,
+          isMain,
+          availableGroups,
+          new Set(Object.keys(deps.registeredGroups())),
+        );
       } else {
         logger.warn(
           { sourceGroup },

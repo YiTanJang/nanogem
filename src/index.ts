@@ -396,7 +396,7 @@ async function main(): Promise<void> {
       queue.setRegisteredGroups(registeredGroups);
       saveState();
     },
-    syncGroupMetadata: (force) => Promise.resolve(),
+    resetQueue: (jid) => queue.notifyIdle(jid),
     getAvailableGroups,
     writeGroupsSnapshot: (gf, im, ag, rj) => writeGroupsSnapshot(gf, im, ag, rj),
     runBuildJob: k8sRuntime.runBuildJob,
@@ -405,15 +405,7 @@ async function main(): Promise<void> {
       : undefined,
     deleteDiscordThread: discord
       ? async (jid) => {
-          const group = registeredGroups[jid];
           await discord!.deleteThread(jid);
-          if (group) { // Only attempt to delete internal registration if it exists
-              if (group.ephemeral) fs.rmSync(resolveGroupFolderPath(group.folder), { recursive: true, force: true });
-              deleteRegisteredGroup(jid);
-              delete registeredGroups[jid];
-              queue.setRegisteredGroups(registeredGroups);
-              saveState();
-          }
         }
       : undefined,
   });

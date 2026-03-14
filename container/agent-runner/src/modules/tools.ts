@@ -117,9 +117,9 @@ export const Tools = {
     }
   },
   delegate_task: {
-    description: 'Assign a structured task to another agent.',
+    description: 'Assign a structured task to another agent. MANDATORY: You must use the exact snowflake JID (e.g., "discord-148240...") retrieved from list_groups. Names or folder names will NOT work.',
     schema: z.object({
-      targetJid: z.string().describe('The JID of the agent to delegate to'),
+      targetJid: z.string().describe('The official snowflake JID of the agent'),
       task: z.string().describe('Task description'),
       expectedOutput: z.string().describe('Definition of final result'),
     }),
@@ -188,13 +188,13 @@ export const Tools = {
     fn: (args: any, _context: any) => updateMemory(args.category, args.content)
   },
   schedule_task: {
-    description: 'Schedule a recurring or one-time AI task.',
+    description: 'Schedule a recurring or one-time AI task. MANDATORY: targetJid must be an official snowflake JID (e.g., "discord-148240...") retrieved from list_groups.',
     schema: z.object({
       prompt: z.string().describe('Task prompt'),
       schedule_type: z.enum(['cron', 'interval', 'once']),
       schedule_value: z.string().describe('Cron expression, ms, or timestamp'),
       context_mode: z.enum(['group', 'isolated']).optional().default('group'),
-      targetJid: z.string().optional().describe('Optional target JID'),
+      targetJid: z.string().optional().describe('The official snowflake JID of the target agent'),
     }),
     fn: (args: any, context: any) => {
       writeIpcFile(TASKS_DIR, { 

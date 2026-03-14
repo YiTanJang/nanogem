@@ -52,7 +52,6 @@ beforeEach(() => {
   setRegisteredGroup('third', THIRD_GROUP);
 
   deps = {
-    sendMessage: async () => {},
     registeredGroups: () => groups,
     registerGroup: (jid, group) => {
       groups[jid] = group;
@@ -63,7 +62,8 @@ beforeEach(() => {
       delete groups[jid];
       deleteRegisteredGroup(jid);
     },
-    syncGroupMetadata: async () => {},
+    sendMessage: async () => {},
+    resetQueue: () => {},
     getAvailableGroups: () => [],
     writeGroupsSnapshot: () => {},
   };
