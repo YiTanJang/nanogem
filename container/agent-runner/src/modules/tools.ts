@@ -407,15 +407,19 @@ export const Tools = {
  */
 export function getToolDeclarations(): any[] {
   return Object.entries(Tools).map(([name, tool]) => {
-    // Use zod-to-json-schema
-    const jsonSchema = zodToJsonSchema(tool.schema as any) as any;
-    
+    // Zod 4.x has a native toJSONSchema method that is robust for this version
+    const jsonSchema = (tool.schema as any).toJSONSchema();
+
+    // Debug: Log the final properties to pod stderr
+    const props = jsonSchema.properties || {};
+    console.error(`[debug-schema] Tool: ${name}, Properties: ${Object.keys(props).join(', ')}`);
+
     return {
       name,
       description: tool.description,
       parameters: {
         type: 'OBJECT',
-        properties: jsonSchema.properties || {},
+        properties: props,
         required: jsonSchema.required || [],
       }
     };
