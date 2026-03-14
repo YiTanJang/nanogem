@@ -69,10 +69,15 @@ export class McpManager {
 
         for (const tool of tools) {
           this.toolToClient.set(tool.name, name);
+          const schema = tool.inputSchema as any;
           this.mcpTools.push({
             name: tool.name,
             description: tool.description,
-            parameters: tool.inputSchema as any,
+            parameters: {
+              type: 'OBJECT',
+              properties: schema?.properties || {},
+              required: schema?.required || [],
+            },
           });
         }
       } catch (err: any) {

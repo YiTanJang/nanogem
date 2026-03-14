@@ -5,7 +5,7 @@ import { ContainerInput, ContainerOutput, IPC_DIR, IPC_INPUT_CLOSE_SENTINEL, IPC
 import { McpManager } from './mcp.js';
 
 export class GeminiManager {
-  private client: any;
+  public client: any;
   private modelName: string;
   private chat: any;
   private cachedContentName: string | undefined;

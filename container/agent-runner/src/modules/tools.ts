@@ -100,7 +100,7 @@ export const Tools = {
     }),
     fn: async (args: any, context: any) => {
       try {
-        const searchResponse = await context.client.models.generateContent({
+        const searchResponse = await context.client.client.models.generateContent({
           model: context.modelName,
           contents: [{ role: 'user', parts: [{ text: `Search the web and provide a detailed summary for: ${args.query}` }] }],
           config: { tools: [{ googleSearch: {} }] }
@@ -188,18 +188,22 @@ export const Tools = {
     fn: (args: any, _context: any) => updateMemory(args.category, args.content)
   },
   schedule_task: {
-    description: 'Schedule a recurring or one-time AI task. MANDATORY: targetJid must be an official snowflake JID (e.g., "discord-148240...") retrieved from list_groups.',
+    description: 'Schedule a recurring or one-time AI task. MANDATORY: target_group_jid must be an official snowflake JID (e.g., "discord-148240...") retrieved from list_groups.',
     schema: z.object({
       prompt: z.string().describe('Task prompt'),
       schedule_type: z.enum(['cron', 'interval', 'once']),
       schedule_value: z.string().describe('Cron expression, ms, or timestamp'),
       context_mode: z.enum(['group', 'isolated']).optional().default('group'),
-      targetJid: z.string().optional().describe('The official snowflake JID of the target agent'),
+      target_group_jid: z.string().optional().describe('The official snowflake JID of the target agent'),
     }),
     fn: (args: any, context: any) => {
       writeIpcFile(TASKS_DIR, { 
         type: 'schedule_task', 
-        ...args, 
+        prompt: args.prompt,
+        schedule_type: args.schedule_type,
+        schedule_value: args.schedule_value,
+        context_mode: args.context_mode || 'group',
+        targetJid: args.target_group_jid,
         createdBy: context.input.groupFolder, 
         timestamp: new Date().toISOString() 
       });
@@ -209,30 +213,30 @@ export const Tools = {
   pause_task: {
     description: 'Pause a scheduled task.',
     schema: z.object({
-      id: z.string().describe('The task ID to pause'),
+      task_id: z.string().describe('The task ID to pause'),
     }),
     fn: (args: any, _context: any) => {
-      writeIpcFile(TASKS_DIR, { type: 'pause_task', ...args, timestamp: new Date().toISOString() });
+      writeIpcFile(TASKS_DIR, { type: 'pause_task', taskId: args.task_id, timestamp: new Date().toISOString() });
       return 'Task pause requested.';
     }
   },
   resume_task: {
     description: 'Resume a paused scheduled task.',
     schema: z.object({
-      id: z.string().describe('The task ID to resume'),
+      task_id: z.string().describe('The task ID to resume'),
     }),
     fn: (args: any, _context: any) => {
-      writeIpcFile(TASKS_DIR, { type: 'resume_task', ...args, timestamp: new Date().toISOString() });
+      writeIpcFile(TASKS_DIR, { type: 'resume_task', taskId: args.task_id, timestamp: new Date().toISOString() });
       return 'Task resume requested.';
     }
   },
   cancel_task: {
     description: 'Cancel and delete a scheduled task.',
     schema: z.object({
-      id: z.string().describe('The task ID to cancel'),
+      task_id: z.string().describe('The task ID to cancel'),
     }),
     fn: (args: any, _context: any) => {
-      writeIpcFile(TASKS_DIR, { type: 'cancel_task', ...args, timestamp: new Date().toISOString() });
+      writeIpcFile(TASKS_DIR, { type: 'cancel_task', taskId: args.task_id, timestamp: new Date().toISOString() });
       return 'Task cancellation requested.';
     }
   },
@@ -330,16 +334,18 @@ export const Tools = {
   list_groups: {
     description: 'List all registered and available agent groups. Always use this to find the JID of a newly created sub-agent.',
     schema: z.object({}),
-    fn: (_args: any, _context: any) => {
+    fn: async (_args: any, _context: any) => {
       // First, request a refresh to ensure the snapshot is fresh
       writeIpcFile(TASKS_DIR, { type: 'refresh_groups', timestamp: new Date().toISOString() });
       
       const groupsFile = '/workspace/ipc/available_groups.json';
-      if (!fs.existsSync(groupsFile)) return 'Group list not available yet. Please wait a few seconds and try again.';
-      
-      // Return the current snapshot
-      const content = fs.readFileSync(groupsFile, 'utf-8');
-      return content;
+      for (let i = 0; i < 15; i++) {
+        if (fs.existsSync(groupsFile)) {
+          return fs.readFileSync(groupsFile, 'utf-8');
+        }
+        await new Promise(r => setTimeout(r, 200));
+      }
+      return 'Group list not available yet. Please wait a few seconds and try again.';
     }
   },
   append_thought: {
@@ -401,8 +407,8 @@ export const Tools = {
  */
 export function getToolDeclarations(): any[] {
   return Object.entries(Tools).map(([name, tool]) => {
-    // Zod 4.x has a native toJSONSchema method
-    const jsonSchema = (tool.schema as any).toJSONSchema();
+    // Use zod-to-json-schema
+    const jsonSchema = zodToJsonSchema(tool.schema as any) as any;
     
     return {
       name,

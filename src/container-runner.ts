@@ -527,18 +527,13 @@ async function runAgentPod(
       clearInterval(backupInterval);
       fsWatcher.close();
 
-      // Master Cleanup: The ONLY place where the pod is deleted.
-      try {
-        await k8sRuntime.stopPod(podName);
-      } catch (err) {}
-
       if (!firstOutputResolved) {
         try {
           const logRes = await getK8sApi().readNamespacedPodLog({
             name: podName,
             namespace: K8S_NAMESPACE,
           });
-          const logs = logRes;
+          const logs = typeof logRes === 'string' ? logRes : (logRes as any).body || String(logRes);
           const startIdx = logs.indexOf(OUTPUT_START_MARKER);
           const endIdx = logs.indexOf(OUTPUT_END_MARKER);
 
@@ -546,15 +541,22 @@ async function runAgentPod(
             const jsonStr = logs.slice(startIdx + OUTPUT_START_MARKER.length, endIdx).trim();
             const parsed = JSON.parse(jsonStr) as ContainerOutput;
             resolveFirstOutput(parsed);
-            return parsed;
+          } else {
+            const errResult: ContainerOutput = { status: 'error', result: null, error: 'Pod finished without output markers' };
+            resolveFirstOutput(errResult);
           }
         } catch (err) {
           logger.error({ err, podName }, 'Failed to read final pod logs');
+          const errResult: ContainerOutput = { status: 'error', result: null, error: 'Pod finished without output markers' };
+          resolveFirstOutput(errResult);
         }
-        const errResult: ContainerOutput = { status: 'error', result: null, error: 'Pod finished without output markers' };
-        resolveFirstOutput(errResult);
-        return errResult;
       }
+
+      // Master Cleanup: The ONLY place where the pod is deleted.
+      try {
+        await k8sRuntime.stopPod(podName);
+      } catch (err) {}
+
       return null;
     })();
 
