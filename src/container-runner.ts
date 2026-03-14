@@ -73,15 +73,14 @@ function buildVolumeMounts(
   const projectRoot = process.cwd();
   const groupDir = resolveGroupFolderPath(group.folder);
 
-  if (isMain) {
-    // Main gets the project root read-only. Writable paths the agent needs
-    // (group folder, IPC, .gemini/) are mounted separately below.
-    mounts.push({
-      hostPath: projectRoot,
-      containerPath: '/workspace/project',
-      readonly: true,
-    });
+  // EVERY agent gets the project root read-only.
+  mounts.push({
+    hostPath: projectRoot,
+    containerPath: '/workspace/project',
+    readonly: true,
+  });
 
+  if (isMain) {
     // Selective Self-Improvement (READ-WRITE)
     mounts.push({
       hostPath: path.join(projectRoot, 'src'),
@@ -101,19 +100,11 @@ function buildVolumeMounts(
       readonly: false,
     });
   } else {
-    // Other groups only get their own folder
+    // Other groups only get their own folder (READ-WRITE)
     mounts.push({
       hostPath: groupDir,
       containerPath: '/workspace/group',
       readonly: false,
-    });
-
-    // Mount all groups directory read-only so they can see each other's reports/thoughts
-    const groupsRoot = path.join(projectRoot, 'groups');
-    mounts.push({
-      hostPath: groupsRoot,
-      containerPath: '/workspace/project/groups',
-      readonly: true,
     });
 
     // Mount source code read-write for auto-evolution
