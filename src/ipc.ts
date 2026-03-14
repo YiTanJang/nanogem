@@ -190,6 +190,23 @@ export function startIpcWatcher(deps: IpcDeps): void {
   logger.info('IPC watcher started (per-group namespaces)');
 }
 
+/**
+ * Smart Router: Resolves a human-readable target (Name, Folder, or JID) to a verified JID.
+ */
+function resolveSmartTarget(target: string, groups: Record<string, RegisteredGroup>): string | undefined {
+  if (!target) return undefined;
+  // 1. Exact JID match
+  if (groups[target]) return target;
+  // 2. Name or Folder match (case-insensitive, most recent first)
+  const resolved = Object.entries(groups)
+    .filter(([_, g]) => 
+      g.name.toLowerCase() === target.toLowerCase() || 
+      g.folder.toLowerCase() === target.toLowerCase()
+    )
+    .sort((a, b) => new Date(b[1].added_at).getTime() - new Date(a[1].added_at).getTime());
+  return resolved.length > 0 ? resolved[0][0] : undefined;
+}
+
 export async function processTaskIpc(
   data: {
     type: string;
@@ -230,45 +247,31 @@ export async function processTaskIpc(
   const registeredGroups = deps.registeredGroups();
 
   switch (data.type) {
-    case 'write_mission':
-      if (data.targetJid && data.mission) {
-        const targetGroup = registeredGroups[data.targetJid];
-        if (!targetGroup) {
-          logger.warn({ targetJid: data.targetJid }, 'Cannot write mission: target not registered');
-          break;
-        }
-
+    case 'write_mission': {
+      const targetJid = resolveSmartTarget(data.targetJid || '', registeredGroups);
+      if (targetJid && data.mission) {
+        const targetGroup = registeredGroups[targetJid];
         const targetFolder = targetGroup.folder;
-        // Authorization: non-main groups can only write to their own children or self
-        // (For now we allow any registered group to write to any other if they know the JID, 
-        // as the tool itself is only available to agents)
-        
         const missionDir = path.join(GROUPS_DIR, targetFolder, '.nanogem');
         fs.mkdirSync(missionDir, { recursive: true });
         fs.writeFileSync(path.join(missionDir, 'mission.json'), JSON.stringify(data.mission, null, 2));
-        logger.info({ from: sourceGroup, to: targetFolder }, 'Mission written to disk');
+        logger.info({ from: sourceGroup, to: targetFolder, resolvedJid: targetJid }, 'Mission routed successfully');
+      } else if (data.targetJid) {
+        logger.warn({ target: data.targetJid }, 'Smart Router failed to find mission target');
       }
       break;
+    }
 
-    case 'schedule_task':
+    case 'schedule_task': {
+      const targetJid = resolveSmartTarget(data.targetJid || '', registeredGroups);
       if (
         data.prompt &&
         data.schedule_type &&
         data.schedule_value &&
-        data.targetJid
+        targetJid
       ) {
         // Resolve the target group from JID
-        const targetJid = data.targetJid as string;
         const targetGroupEntry = registeredGroups[targetJid];
-
-        if (!targetGroupEntry) {
-          logger.warn(
-            { targetJid },
-            'Cannot schedule task: target group not registered',
-          );
-          break;
-        }
-
         const targetFolder = targetGroupEntry.folder;
 
         // Authorization: non-main groups can only schedule for themselves
@@ -341,6 +344,7 @@ export async function processTaskIpc(
         logger.warn({ data }, 'Invalid schedule_task request - missing fields');
       }
       break;
+    }
 
     case 'pause_task':
       if (data.taskId) {
