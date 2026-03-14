@@ -286,10 +286,22 @@ export class GroupQueue {
     }, delayMs);
   }
 
-  private drainGroup(groupJid: string): void {
+  private async drainGroup(groupJid: string): Promise<void> {
     if (this.shuttingDown) return;
 
     const state = this.getGroup(groupJid);
+
+    // --- BUG FIX: Health Check ---
+    // If the group is marked active but has no recorded process, or the process is dead, reset it.
+    if (state.active && !state.process) {
+      logger.warn({ groupJid }, 'Queue state was locked active with no process. Auto-unlocking.');
+      state.active = false;
+    }
+
+    if (state.active) {
+      logger.debug({ groupJid }, 'Group is active, skipping drain');
+      return;
+    }
 
     if (state.pendingTasks.length > 0) {
       const task = state.pendingTasks.shift()!;
