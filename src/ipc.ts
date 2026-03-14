@@ -195,16 +195,26 @@ export function startIpcWatcher(deps: IpcDeps): void {
  */
 function resolveSmartTarget(target: string, groups: Record<string, RegisteredGroup>): string | undefined {
   if (!target) return undefined;
-  // 1. Exact JID match
+  
+  // 1. Literal JID match (if it's already registered, use it)
   if (groups[target]) return target;
-  // 2. Name or Folder match (case-insensitive, most recent first)
+
+  // 2. Name or Folder match (Role-Based Addressing)
+  // We check this if the literal JID failed, regardless of format.
   const resolved = Object.entries(groups)
     .filter(([_, g]) => 
       g.name.toLowerCase() === target.toLowerCase() || 
-      g.folder.toLowerCase() === target.toLowerCase()
+      g.folder.toLowerCase() === target.toLowerCase() ||
+      target.toLowerCase().includes(g.folder.toLowerCase()) // Handle partial hallucination
     )
     .sort((a, b) => new Date(b[1].added_at).getTime() - new Date(a[1].added_at).getTime());
-  return resolved.length > 0 ? resolved[0][0] : undefined;
+
+  if (resolved.length > 0) {
+    logger.info({ target, resolved: resolved[0][0] }, 'Resolved target via Aggressive Smart Router');
+    return resolved[0][0];
+  }
+
+  return undefined;
 }
 
 export async function processTaskIpc(
