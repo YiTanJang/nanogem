@@ -201,14 +201,17 @@ if (needsTrigger) {
   const hasTriggerPattern = (isInternalTarget || isDiscord) && missedMessages.some((m) => TRIGGER_PATTERN.test(m.content));
 
   if (!hasBotFlag && !hasTriggerPattern) {
+    logger.debug(
+      { chatJid, content: missedMessages[missedMessages.length - 1].content },
+      'Skipping message: no mention and no trigger pattern'
+    );
     updateLastAgentTimestamp(chatJid, missedMessages[missedMessages.length - 1].timestamp);
     return true;
   }
-}
+  }
 
   const prompt = formatMessages(missedMessages);
   logger.info({ group: group.name, messageCount: missedMessages.length }, 'Processing messages');
-
   const channel = findChannel(channels, chatJid);
   await channel?.setTyping?.(chatJid, true);
 
