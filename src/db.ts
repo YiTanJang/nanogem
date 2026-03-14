@@ -272,6 +272,12 @@ export function setLastGroupSync(): void {
  * Only call this for registered groups where message history is needed.
  */
 export function storeMessage(msg: NewMessage): void {
+  // Ensure the chat exists to satisfy foreign key constraints
+  db.prepare(
+    `INSERT INTO chats (jid, name, last_message_time, is_group) VALUES (?, ?, ?, ?)
+     ON CONFLICT(jid) DO UPDATE SET last_message_time = excluded.last_message_time`,
+  ).run(msg.chat_jid, msg.chat_jid, msg.timestamp, 1);
+
   db.prepare(
     `INSERT OR REPLACE INTO messages (id, chat_jid, sender, sender_name, content, timestamp, is_from_me, is_bot_message) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
